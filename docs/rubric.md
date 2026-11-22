@@ -141,6 +141,12 @@ Rules:
 - The judge must not give the teacher the lesson’s final answer; feedback is about
   teaching moves.
 
+## Implementation
+
+The judge lives in `server/app/judge.py`; the API and validation harness are
+documented in [`judge.md`](judge.md). `delivery` is scored from ASR speech
+duration when voice input exists; visual domains remain `N/A`.
+
 ## Human validation
 
 - Two raters independently code 20–30% of sessions.

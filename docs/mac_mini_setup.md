@@ -36,6 +36,7 @@ ssh <username>@<mac-mini-ip>
 brew install ollama python@3.12 git
 brew services start ollama
 ollama pull qwen2.5:3b-instruct-q4_K_M
+ollama pull qwen2.5:7b-instruct-q4_K_M   # judge only
 
 # Optional: test TTS
 say -v Yuna "안녕하세요. 심클래스입니다."
@@ -60,6 +61,7 @@ If `mlx-whisper` is not available on the machine, use `whisper.cpp` and set
 ```bash
 LLM_MODE=ollama \
 OLLAMA_MODEL=qwen2.5:3b-instruct-q4_K_M \
+JUDGE_MODEL=qwen2.5:7b-instruct-q4_K_M \
 ASR_MODE=mlx \
 TTS_MODE=say \
 TTS_VOICE=Yuna \
@@ -122,5 +124,7 @@ If the Mac mini is unavailable:
 
 - Keep `server.txt` at `http://127.0.0.1:8010` and run the server locally.
 - `LLM_MODE=mock`, `ASR_MODE=mock`, `TTS_MODE=mock`.
+- The judge falls back to the deterministic rule-based mode and the report is
+  labelled `heuristic` / `heuristic_fallback`.
 - The Processing UI still works with cached/mock responses; the feedback and
   model-quality claims are not part of the fallback demo.

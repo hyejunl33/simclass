@@ -75,6 +75,7 @@ class AudioRequest(BaseModel):
 class ASRResponse(BaseModel):
     text: str
     mode: str
+    duration_sec: float = 0.0
 
 
 class TTSRequest(BaseModel):

@@ -10,12 +10,12 @@ import httpx
 DEFAULT_MOCK = "물건의 의미는 무엇일까요?"
 
 
-def transcribe_bytes(data: bytes) -> tuple[str, str]:
+def transcribe_bytes(data: bytes) -> tuple[str, str, float]:
     mode = os.getenv("ASR_MODE", "mock").strip().lower()
     if not data:
         raise ValueError("Empty audio")
     if mode == "mock":
-        return DEFAULT_MOCK, "mock"
+        return DEFAULT_MOCK, "mock", 0.0
     if mode == "http":
         url = os.getenv("ASR_URL", "http://127.0.0.1:8001/asr")
         payload = {"filename": "audio.wav", "data_base64": base64.b64encode(data).decode("ascii")}
@@ -23,7 +23,11 @@ def transcribe_bytes(data: bytes) -> tuple[str, str]:
             res = client.post(url, json=payload)
             res.raise_for_status()
             body = res.json()
-        return str(body.get("text", "")).strip(), "http"
+        return (
+            str(body.get("text", "")).strip(),
+            "http",
+            float(body.get("duration_sec", 0.0) or 0.0),
+        )
     if mode in {"mlx", "mlx_whisper"}:
         import mlx_whisper  # type: ignore
         import numpy as np
@@ -47,7 +51,8 @@ def transcribe_bytes(data: bytes) -> tuple[str, str]:
                 language="ko",
                 condition_on_previous_text=False,
             )
-            return str(result.get("text", "")).strip(), "mlx_whisper"
+            duration = round(len(audio) / float(sr), 2) if sr else 0.0
+            return str(result.get("text", "")).strip(), "mlx_whisper", duration
         finally:
             path.unlink(missing_ok=True)
     raise ValueError(f"Unsupported ASR_MODE: {mode}")

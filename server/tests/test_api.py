@@ -483,3 +483,36 @@ def test_judge_accepts_quotes_with_phase_suffix():
         )
     ]
     assert _find_quote(transcript, "교사: 지난 시간에 무엇을 배웠나요? (학습 문제 확인)", 0) == 0
+
+
+def test_delivery_domain_scores_voice_speech_rate():
+    from app.judge import _delivery_domain
+    from app.session import TranscriptEntry
+
+    transcript = [
+        TranscriptEntry(
+            t=0, phase_id="concept", phase_name="개념 형성",
+            speaker="teacher", name="교사",
+            text="왜 그렇게 생각했어요?", audio_sec=3.0,
+        )
+    ]
+    domain = _delivery_domain(transcript)
+    assert domain.status == "scored"
+    assert domain.score == 3
+    assert domain.evidence
+    assert "자/초" in domain.reason
+
+
+def test_delivery_is_na_without_voice():
+    from app.judge import _delivery_domain
+    from app.session import TranscriptEntry
+
+    transcript = [
+        TranscriptEntry(
+            t=0, phase_id="intro", phase_name="학습 문제 확인",
+            speaker="teacher", name="교사", text="무엇을 배웠나요?",
+        )
+    ]
+    domain = _delivery_domain(transcript)
+    assert domain.status == "not_assessed"
+    assert domain.score is None

@@ -25,6 +25,7 @@ import processing.data.JSONObject;
 // phase timer, session end, and transcript + KT replay.
 
 String SERVER_BASE = "http://127.0.0.1:8010";
+String REPORT_DIR = System.getProperty("user.home") + "/SimClassReports";
 String lessonId = "objects-meaning";
 String lessonTopic = "물건의 의미는 무엇일까요?";
 String lessonSummary = "HWP를 불러오면 수업안 요약이 표시됩니다.";
@@ -36,6 +37,7 @@ ArrayList<String> misconceptionIds = new ArrayList<String>();
 LinkedBlockingQueue<String> ttsQueue = new LinkedBlockingQueue<String>();
 boolean sending = false;
 boolean recording = false;
+float lastAudioSec = 0;
 boolean advancing = false;
 boolean lastAdvanceFailed = false;
 long lastAdvanceAttemptMs = 0;
@@ -501,6 +503,7 @@ void startSession() {
   phaseIndex = 0;
   sessionEnded = false;
   input = "";
+  lastAudioSec = 0;
   status = "세션을 시작하는 중...";
 
   new Thread(() -> {
@@ -657,7 +660,8 @@ void requestJudge() {
             d.getString("reason"), d.getString("improvement"), evidence));
       }
       String md = getJson(SERVER_BASE + "/api/session/" + sessionId + "/report.md");
-      String path = sketchPath("report-" + sessionId + ".md");
+      new java.io.File(REPORT_DIR).mkdirs();
+      String path = REPORT_DIR + "/report-" + sessionId + ".md";
       saveStrings(path, split(md, "\n"));
 
       feedbackDomains = list;
@@ -758,6 +762,7 @@ void hwpSelected(File selection) {
       sessionEnded = false;
       replayMode = false;
       feedbackMode = false;
+      lastAudioSec = 0;
       feedbackDomains.clear();
       feedbackSummary = "";
       reportTextPath = "";
@@ -840,6 +845,7 @@ void stopRecordingAndSend() {
         JSONObject res = parseJSONObject(postJson(SERVER_BASE + "/api/asr", payload.toString()));
         String text = res.getString("text");
         input = text;
+        lastAudioSec = res.isNull("duration_sec") ? 0 : res.getFloat("duration_sec");
         transcript.add("[음성] " + text);
         status = "음성 인식 완료 (" + res.getString("mode") + ")";
         sendTurn();
@@ -877,6 +883,8 @@ void sendTurn() {
   if (utterance.length() == 0 || sending) return;
   input = "";
   sending = true;
+  float audioSec = lastAudioSec;
+  lastAudioSec = 0;
   status = "서버에 발문을 보내는 중...";
   transcript.add("T: " + utterance);
 
@@ -888,6 +896,7 @@ void sendTurn() {
       payload.setString("lesson_id", lessonId);
       payload.setString("phase_id", phaseId);
       payload.setString("teacher_utterance", utterance);
+      payload.setFloat("audio_sec", audioSec);
       String response = postJson(SERVER_BASE + "/api/turn", payload.toString());
       JSONObject res = parseJSONObject(response);
       JSONArray arr = res.getJSONArray("students");

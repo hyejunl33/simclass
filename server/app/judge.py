@@ -102,6 +102,54 @@ class ValidationSample(BaseModel):
     report_path: str
 
 
+def _delivery_domain(transcript: list[TranscriptEntry]) -> DomainScore:
+    voice = [
+        (i, e)
+        for i, e in enumerate(transcript)
+        if e.speaker == "teacher" and e.audio_sec and e.audio_sec > 0.5
+    ]
+    if not voice:
+        return DomainScore(
+            id="delivery",
+            name="전달 태도(음성)",
+            status="not_assessed",
+            score=None,
+            reason="음성 입력이 없어 말 속도를 평가하지 않았습니다. 텍스트 발문만으로는 전달 태도를 판단할 수 없습니다.",
+            improvement="음성으로 발문하면 발화 시간 대비 말 속도를 자동 계산합니다.",
+        )
+    rates = [
+        len(re.sub(r"\s", "", e.text)) / e.audio_sec
+        for _, e in voice
+        if e.audio_sec > 0
+    ]
+    avg = round(sum(rates) / len(rates), 2) if rates else 0.0
+    if 2.5 <= avg <= 5.5:
+        score = 3
+    elif 1.5 <= avg <= 7.0:
+        score = 2
+    else:
+        score = 1
+    evidence = [
+        Evidence(turn_id=i, quote=e.text.strip()[:200])
+        for i, e in voice[:3]
+        if e.text.strip()
+    ]
+    return DomainScore(
+        id="delivery",
+        name="전달 태도(음성)",
+        status="scored",
+        score=score,
+        evidence=evidence,
+        reason=(
+            f"음성 발문 {len(voice)}회의 평균 말 속도가 약 {avg:.1f}자/초입니다. "
+            "쉼·추임새는 별도로 측정하지 않았습니다."
+        ),
+        improvement=(
+            "질문 뒤 2~3초 쉼을 두고, 문장을 짧게 끊어 말해 학생이 따라올 시간을 주세요."
+        ),
+    )
+
+
 def _teacher_entries(transcript: list[TranscriptEntry]) -> list[tuple[int, TranscriptEntry]]:
     return [(i, e) for i, e in enumerate(transcript) if e.speaker == "teacher"]
 
@@ -281,14 +329,7 @@ def _heuristic_domains(
             ),
             improvement="수업안의 자료와 유의점을 발문에 직접 연결하고, 예상 밖 반응에는 계획을 조정하는 발언을 넣으세요.",
         ),
-        DomainScore(
-            id="delivery",
-            name="전달 태도(음성)",
-            status="not_assessed",
-            score=None,
-            reason="이 데모는 음성 속도·쉼·추임새 같은 음향 특징을 저장하지 않아 전달 태도를 평가하지 않습니다.",
-            improvement="음성 특징을 저장한 뒤 말 속도, 질문 후 쉼, 추임새 비율로 평가하세요.",
-        ),
+        _delivery_domain(transcript),
     ]
 
     misconceptions: list[MisconceptionCoverage] = []
@@ -509,16 +550,7 @@ def _llm_report(
     if len(domains) < len(SCORED_DOMAINS):
         raise ValueError("LLM judge did not return all scored domains")
 
-    domains.append(
-        DomainScore(
-            id="delivery",
-            name="전달 태도(음성)",
-            status="not_assessed",
-            score=None,
-            reason="음성 속도·쉼·추임새는 이 데모에서 저장하지 않아 평가하지 않습니다.",
-            improvement="음성 특징을 저장한 뒤 말 속도, 질문 후 쉼, 추임새 비율로 평가하세요.",
-        )
-    )
+    domains.append(_delivery_domain(transcript))
 
     misconceptions: list[MisconceptionCoverage] = []
     raw_mis = {
@@ -547,7 +579,7 @@ def _llm_report(
         domains=domains,
         talk_moves=counts,
         misconceptions=misconceptions,
-        not_assessed=VISUAL_NOT_ASSESSED + ["delivery_audio_features"],
+        not_assessed=VISUAL_NOT_ASSESSED + ["pauses_and_fillers"],
         summary=str(payload.get("summary", "")).strip()[:600],
         mode="ollama",
         validation=validated,
@@ -582,7 +614,7 @@ def _heuristic_report(session: SessionState) -> JudgeReport:
         domains=domains,
         talk_moves=counts,
         misconceptions=misconceptions,
-        not_assessed=VISUAL_NOT_ASSESSED + ["delivery_audio_features"],
+        not_assessed=VISUAL_NOT_ASSESSED + ["pauses_and_fillers"],
         summary=summary,
         mode="heuristic",
     )

@@ -64,6 +64,7 @@ class TurnRequest(BaseModel):
     lesson_id: str = "objects-meaning"
     phase_id: str = "concept"
     teacher_utterance: str = Field(min_length=1)
+    audio_sec: float = 0.0
     persona_ids: list[str] | None = None
 
 
@@ -249,8 +250,8 @@ def get_agreement() -> dict[str, Any]:
 def asr(req: AudioRequest) -> ASRResponse:
     try:
         data = base64.b64decode(req.data_base64, validate=True)
-        text, mode = transcribe_bytes(data)
-        return ASRResponse(text=text, mode=mode)
+        text, mode, duration = transcribe_bytes(data)
+        return ASRResponse(text=text, mode=mode, duration_sec=duration)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -326,7 +327,14 @@ def turn(req: TurnRequest) -> TurnResponse:
         update_mastery(state[s["id"]], kc, correct)
         s["mastery"] = dict(state[s["id"]])
 
-    record_turn(session, req.teacher_utterance, result["students"], phase_id, state)
+    record_turn(
+        session,
+        req.teacher_utterance,
+        result["students"],
+        phase_id,
+        state,
+        audio_sec=max(0.0, req.audio_sec),
+    )
     students = [StudentResponse(**s) for s in result["students"]]
     kt = {pid: dict(values) for pid, values in state.items()}
     return TurnResponse(students=students, kt=kt, mode=result["mode"])

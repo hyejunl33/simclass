@@ -17,6 +17,7 @@ class TranscriptEntry(BaseModel):
     text: str
     student_id: str = ""
     state: str = ""
+    audio_sec: float = 0.0
     kt: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
@@ -228,6 +229,7 @@ def record_turn(
     students: list[dict[str, Any]],
     phase_id: str,
     kt: dict[str, dict[str, float]],
+    audio_sec: float = 0.0,
 ) -> None:
     phase = next(
         (p for p in session.lesson.phases if p.id == phase_id),
@@ -243,6 +245,7 @@ def record_turn(
             speaker="teacher",
             name="교사",
             text=teacher_text,
+            audio_sec=audio_sec,
             kt=_copy_kt(kt),
         )
     )

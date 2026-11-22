@@ -81,6 +81,22 @@ In the Processing app, use **수업 시작 → 발문/음성 입력 → 다음 �
 again for the practice-effect comparison. See
 [`docs/session_flow.md`](docs/session_flow.md).
 
+## Rubric feedback
+
+After the session ends, **피드백** runs a two-stage judge (talk-move coding, then
+rubric scoring). Every score has evidence quotes that are checked against the
+transcript; invalid quotes are rejected and the judge retries. Visual behaviors
+are `N/A`, and audio delivery is scored from ASR speech duration when voice input
+was used.
+
+- `POST /api/session/{id}/judge` — run the judge
+- `GET /api/session/{id}/report.md` — Markdown report
+- `GET /api/validation/sample?ratio=0.25` — human double-coding sample
+- `GET /api/validation/agreement` — exact agreement + Cohen's kappa
+
+Reports are written to `reports/` on the server. See
+[`docs/judge.md`](docs/judge.md).
+
 ## Local LLM (Ollama)
 
 The server uses a prompt-only small model; no fine-tuning.
@@ -88,7 +104,10 @@ The server uses a prompt-only small model; no fine-tuning.
 ```bash
 # Mac mini
 ollama pull qwen2.5:3b-instruct-q4_K_M
-LLM_MODE=ollama OLLAMA_MODEL=qwen2.5:3b-instruct-q4_K_M \
+LLM_MODE=ollama \
+OLLAMA_MODEL=qwen2.5:3b-instruct-q4_K_M \
+JUDGE_MODEL=qwen2.5:7b-instruct-q4_K_M \
+ASR_MODE=mlx TTS_MODE=say TTS_VOICE=Yuna \
   uvicorn app.main:app --host 0.0.0.0 --port 8010
 ```
 
@@ -112,12 +131,14 @@ See [docs/mac_mini_setup.md](docs/mac_mini_setup.md) and
 - [`docs/ws_protocol.md`](docs/ws_protocol.md) — message contract
 - [`docs/mac_mini_setup.md`](docs/mac_mini_setup.md) — Mac mini runtime + laptop connection
 - [`docs/session_flow.md`](docs/session_flow.md) — 40-minute phases, session API, replay
+- [`docs/judge.md`](docs/judge.md) — two-stage rubric judge, evidence rules, human validation
 - [`fixtures/lesson_plans/objects_meaning.json`](fixtures/lesson_plans/objects_meaning.json) — 즐생 lesson fixture
 - [`fixtures/personas/objects_meaning.json`](fixtures/personas/objects_meaning.json) — three persona fixture
 
 ## Status
 
-Tickets 01–08 are implemented and verified on the Mac mini: end-to-end loop,
-HWP ingest, persona generation/editing, Ollama fallback, BKT mastery, real-time
-voice (MLX Whisper), macOS TTS, and the 40-minute phase flow + replay. The next
-slices are the rubric judge (ticket 09) and demo hardening (ticket 10).
+Tickets 01–09 are implemented: end-to-end loop, HWP ingest, persona
+generation/editing, Ollama fallback, BKT mastery, real-time voice (MLX Whisper),
+macOS TTS, the 40-minute phase flow + replay, and the evidence-grounded rubric
+judge with Markdown/JSON reports and a human-validation harness. Remaining work:
+demo hardening (ticket 10) — runbook, cached fallback, sample session, README.
