@@ -29,7 +29,7 @@ def synthesize(text: str, voice: str | None = None) -> tuple[bytes, str]:
         aiff = Path(td) / "out.aiff"
         wav = Path(td) / "out.wav"
         subprocess.run(
-            ["say", "-v", voice, "--data-format=LEI16@22050", "-o", str(aiff), text],
+            ["say", "-v", voice, "-o", str(aiff), text],
             check=True,
             timeout=20,
         )
