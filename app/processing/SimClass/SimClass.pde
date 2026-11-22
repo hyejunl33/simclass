@@ -53,6 +53,11 @@ long phaseAnchorMs = 0;
 int phaseIndex = 0;
 
 boolean replayMode = false;
+boolean feedbackMode = false;
+boolean judging = false;
+String feedbackSummary = "";
+String reportTextPath = "";
+ArrayList<FeedbackDomain> feedbackDomains = new ArrayList<FeedbackDomain>();
 ArrayList<ReplayEntry> replayEntries = new ArrayList<ReplayEntry>();
 ArrayList<String> replaySummary = new ArrayList<String>();
 ArrayList<String> replayKt = new ArrayList<String>();
@@ -149,7 +154,9 @@ void draw() {
   rect(36, 96, 1028 * progress, 6, 3);
 
   drawStudents();
-  if (replayMode) {
+  if (feedbackMode) {
+    drawFeedback();
+  } else if (replayMode) {
     drawReplay();
   } else {
     drawConversation();
@@ -254,7 +261,8 @@ void drawReplay() {
   textSize(18);
   text("리플레이 · 수업 대화 + KT 타임라인", 56, 314);
 
-  drawButton(938, 288, 108, 30, "대화로", true);
+  drawButton(728, 288, 100, 30, judging ? "판정 중..." : "피드백", !judging);
+  drawButton(838, 288, 100, 30, "대화로", true);
 
   textSize(13);
   fill(70, 78, 90);
@@ -291,8 +299,60 @@ void drawReplay() {
   }
 }
 
+void drawFeedback() {
+  fill(255);
+  stroke(225, 228, 234);
+  rect(36, 280, 1028, 400, 14);
+  noStroke();
+  fill(30, 35, 45);
+  textSize(18);
+  text("수업실연 피드백", 56, 314);
+
+  drawButton(728, 288, 100, 30, "리플레이", true);
+  drawButton(838, 288, 108, 30, "보고서 열기", reportTextPath != null && reportTextPath.length() > 0);
+
+  fill(70, 78, 90);
+  textSize(12);
+  text(shorten(feedbackSummary, 110), 56, 340, 980, 20);
+
+  float y = 372;
+  for (int i = 0; i < feedbackDomains.size(); i++) {
+    FeedbackDomain d = feedbackDomains.get(i);
+    fill(30, 35, 45);
+    textSize(14);
+    text(d.name, 56, y);
+
+    fill(scoreColor(d.score, d.status));
+    rect(246, y - 14, 48, 20, 6);
+    fill(255);
+    textSize(12);
+    text(d.status.equals("not_assessed") ? "N/A" : str(d.score), 258, y);
+
+    fill(70, 78, 90);
+    textSize(12);
+    text(shorten(d.reason, 94), 320, y, 700, 18);
+    if (d.evidence != null && d.evidence.length() > 0) {
+      fill(110, 118, 130);
+      text("증거: \"" + shorten(d.evidence, 88) + "\"", 320, y + 16, 700, 16);
+    }
+    y += 44;
+  }
+
+  fill(130, 138, 150);
+  textSize(11);
+  text("※ 공식 채점표가 아니라 대화록 증거 기반 보조 피드백입니다. 전달 태도·시선·제스처는 N/A입니다.", 56, 662);
+}
+
+color scoreColor(int score, String status) {
+  if ("not_assessed".equals(status)) return color(150, 156, 166);
+  if (score >= 3) return color(60, 140, 100);
+  if (score == 2) return color(60, 110, 200);
+  if (score == 1) return color(200, 140, 40);
+  return color(190, 80, 70);
+}
+
 void drawInput() {
-  if (replayMode) return;
+  if (replayMode || feedbackMode) return;
   boolean active = isSessionRunning();
   fill(active ? color(255) : color(243, 245, 248));
   stroke(200, 205, 215);
@@ -352,6 +412,31 @@ void mousePressed() {
 
   // Session controls in the conversation header
   if (mouseY > 288 && mouseY < 318) {
+    if (feedbackMode) {
+      if (mouseX > 728 && mouseX < 828) {
+        feedbackMode = false;
+        replayMode = true;
+        return;
+      }
+      if (mouseX > 838 && mouseX < 938) {
+        if (reportTextPath != null && reportTextPath.length() > 0) {
+          launch(reportTextPath);
+          status = "보고서를 엽니다: " + reportTextPath;
+        } else {
+          status = "저장된 보고서가 없습니다.";
+        }
+        return;
+      }
+      return;
+    }
+    if (replayMode) {
+      if (mouseX > 728 && mouseX < 828) {
+        requestJudge();
+      } else if (mouseX > 838 && mouseX < 938) {
+        replayMode = false;
+      }
+      return;
+    }
     if (mouseX > 738 && mouseX < 830) {
       if (isSessionRunning()) advancePhase();
       return;
@@ -361,9 +446,7 @@ void mousePressed() {
       return;
     }
     if (mouseX > 938 && mouseX < 1046) {
-      if (replayMode) {
-        replayMode = false;
-      } else if (sessionStarted) {
+      if (sessionStarted) {
         endSession(true);
       } else {
         status = "수업을 시작한 뒤 리플레이할 수 있습니다.";
@@ -406,6 +489,10 @@ void mouseWheel(processing.event.MouseEvent event) {
 
 void startSession() {
   replayMode = false;
+  feedbackMode = false;
+  feedbackDomains.clear();
+  feedbackSummary = "";
+  reportTextPath = "";
   transcript.clear();
   replayEntries.clear();
   replaySummary.clear();
@@ -452,7 +539,13 @@ void advancePhase() {
       transcript.add("[단계] " + res.getString("phase_name"));
     } catch (Exception e) {
       lastAdvanceFailed = true;
-      status = "단계 이동 실패: " + e.getMessage();
+      String msg = e.getMessage() == null ? "" : e.getMessage();
+      if (msg.contains("HTTP 404") || msg.contains("HTTP 409")) {
+        sessionEnded = true;
+        status = "세션이 종료되었습니다. 새 세션을 시작하세요.";
+      } else {
+        status = "단계 이동 실패: " + msg;
+      }
     } finally {
       advancing = false;
     }
@@ -473,7 +566,13 @@ void endSession(boolean loadReplayAfter) {
           + " · 발문 " + summary.getInt("turns") + "회";
       if (loadReplayAfter) loadReplay();
     } catch (Exception e) {
-      status = "수업 종료 실패: " + e.getMessage();
+      String msg = e.getMessage() == null ? "" : e.getMessage();
+      if (msg.contains("HTTP 404") || msg.contains("HTTP 409")) {
+        sessionEnded = true;
+        status = "세션이 종료되었습니다. 새 세션을 시작하세요.";
+      } else {
+        status = "수업 종료 실패: " + msg;
+      }
     } finally {
       advancing = false;
     }
@@ -526,6 +625,53 @@ void loadReplay() {
   } catch (Exception e) {
     status = "리플레이 불러오기 실패: " + e.getMessage();
   }
+}
+
+void requestJudge() {
+  if (!sessionStarted || judging) return;
+  if (!sessionEnded) {
+    endSession(true);
+    status = "수업을 종료한 뒤 피드백을 생성합니다.";
+    return;
+  }
+  judging = true;
+  status = "피드백 생성 중... (7B judge, 30~90초)";
+
+  new Thread(() -> {
+    try {
+      JSONObject rep = parseJSONObject(
+          postJson(SERVER_BASE + "/api/session/" + sessionId + "/judge", "{}"));
+      ArrayList<FeedbackDomain> list = new ArrayList<FeedbackDomain>();
+      JSONArray arr = rep.getJSONArray("domains");
+      for (int i = 0; i < arr.size(); i++) {
+        JSONObject d = arr.getJSONObject(i);
+        String status = d.getString("status");
+        int score = d.isNull("score") ? -1 : d.getInt("score");
+        String evidence = "";
+        JSONArray ev = d.getJSONArray("evidence");
+        if (ev != null && ev.size() > 0) {
+          evidence = ev.getJSONObject(0).getString("quote");
+        }
+        list.add(new FeedbackDomain(
+            d.getString("name"), score, status,
+            d.getString("reason"), d.getString("improvement"), evidence));
+      }
+      String md = getJson(SERVER_BASE + "/api/session/" + sessionId + "/report.md");
+      String path = sketchPath("report-" + sessionId + ".md");
+      saveStrings(path, split(md, "\n"));
+
+      feedbackDomains = list;
+      feedbackSummary = rep.getString("summary");
+      reportTextPath = path;
+      replayMode = false;
+      feedbackMode = true;
+      status = "피드백 생성 완료 · 보고서 저장: " + path;
+    } catch (Exception e) {
+      status = "피드백 생성 실패: " + e.getMessage();
+    } finally {
+      judging = false;
+    }
+  }).start();
 }
 
 String ktLine(JSONObject ktMap) {
@@ -611,6 +757,10 @@ void hwpSelected(File selection) {
       sessionStarted = false;
       sessionEnded = false;
       replayMode = false;
+      feedbackMode = false;
+      feedbackDomains.clear();
+      feedbackSummary = "";
+      reportTextPath = "";
       sessionId = "";
       phaseIndex = 0;
       transcript.clear();
@@ -791,7 +941,17 @@ String requestJson(String method, String url, String body) throws Exception {
   }
   int code = conn.getResponseCode();
   if (code != 200) {
-    throw new RuntimeException("HTTP " + code);
+    String detail = "";
+    try (InputStream es = conn.getErrorStream()) {
+      if (es != null) {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        byte[] tmp = new byte[4096];
+        int n;
+        while ((n = es.read(tmp)) > 0) buf.write(tmp, 0, n);
+        detail = new String(buf.toByteArray(), StandardCharsets.UTF_8);
+      }
+    } catch (Exception ignored) {}
+    throw new RuntimeException("HTTP " + code + (detail.length() > 0 ? ": " + detail : ""));
   }
   StringBuilder sb = new StringBuilder();
   try (BufferedReader br = new BufferedReader(
@@ -861,6 +1021,26 @@ class PhaseView {
     this.id = id;
     this.name = name;
     this.minutes = minutes;
+  }
+}
+
+class FeedbackDomain {
+  String name;
+  int score;
+  String status;
+  String reason;
+  String improvement;
+  String evidence;
+
+  FeedbackDomain(
+      String name, int score, String status,
+      String reason, String improvement, String evidence) {
+    this.name = name;
+    this.score = score;
+    this.status = status;
+    this.reason = reason;
+    this.improvement = improvement;
+    this.evidence = evidence;
   }
 }
 

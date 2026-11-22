@@ -121,6 +121,17 @@ def _clean_quote(quote: str) -> str:
     return text.strip()
 
 
+def _matched_quote(quote: str, entry: TranscriptEntry) -> str | None:
+    cleaned = _clean_quote(quote)
+    variants = [cleaned, re.sub(r"\s*\([^()]*\)\s*$", "", cleaned)]
+    target = _norm(entry.text)
+    for variant in variants:
+        value = variant.strip()
+        if len(_norm(value)) >= 2 and _norm(value) in target:
+            return value
+    return None
+
+
 def _quote_in_entry(quote: str, entry: TranscriptEntry) -> bool:
     cleaned = _clean_quote(quote)
     variants = [cleaned, re.sub(r"\s*\([^()]*\)\s*$", "", cleaned)]
@@ -440,17 +451,12 @@ def _validate_llm_domains(
             found = _find_quote(transcript, quote, turn_id)
             if found is None:
                 rejected.append(quote)
-                errors.append(
-                    f"{domain_id}: quote not found in transcript at turn_id {turn_id}: {quote[:60]}"
-                )
                 continue
             if domain_id != "interaction" and transcript[found].speaker != "teacher":
                 rejected.append(quote)
-                errors.append(
-                    f"{domain_id}: evidence must come from a teacher turn: {quote[:60]}"
-                )
                 continue
-            evidence.append(Evidence(turn_id=found, quote=_clean_quote(quote)[:220]))
+            matched = _matched_quote(quote, transcript[found]) or _clean_quote(quote)
+            evidence.append(Evidence(turn_id=found, quote=matched[:220]))
         if score > 0 and not evidence:
             errors.append(f"{domain_id}: score {score} has no valid evidence")
         domains.append(
@@ -490,7 +496,7 @@ def _llm_report(
     errors: list[str] = []
     domains: list[DomainScore] = []
     rejected: list[str] = []
-    for attempt in range(3):
+    for attempt in range(2):
         payload = _call_ollama(_stage2_prompt(lesson, transcript, coded, errors or None))
         domains, errors, rejected = _validate_llm_domains(payload, transcript)
         validated["retries"] = attempt

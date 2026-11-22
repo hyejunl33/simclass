@@ -384,7 +384,7 @@ def test_judge_rejects_invalid_evidence_quotes():
     assert by_id["questioning"].score == 3
     assert "대화록에 없는 문장" in rejected
     assert by_id["structure"].score == 0
-    assert any("not found" in e for e in errors)
+    assert any("no valid evidence" in e for e in errors)
 
 
 def test_human_validation_agreement(tmp_path, monkeypatch):
@@ -469,7 +469,7 @@ def test_judge_rejects_student_evidence_for_teacher_domains():
     assert by_id["structure"].score == 0
     assert by_id["interaction"].score == 2
     assert "경험 때문이에요." in rejected
-    assert any("teacher turn" in e for e in errors)
+    assert any("no valid evidence" in e for e in errors)
 
 
 def test_judge_accepts_quotes_with_phase_suffix():
