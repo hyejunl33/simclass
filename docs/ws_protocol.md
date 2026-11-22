@@ -45,7 +45,7 @@ Response:
 
 ## WebSocket (target)
 
-`ws://<mac-mini>:8000/ws/session`
+`ws://<mac-mini>:8010/ws/session`
 
 ### Client → server
 

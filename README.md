@@ -58,7 +58,7 @@ cd server
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8010
 ```
 
 Open `app/processing/SimClass/SimClass.pde` in Processing and run it. Type a
@@ -76,7 +76,7 @@ The server uses a prompt-only small model; no fine-tuning.
 # Mac mini
 ollama pull qwen2.5:3b-instruct-q4_K_M
 LLM_MODE=ollama OLLAMA_MODEL=qwen2.5:3b-instruct-q4_K_M \
-  uvicorn app.main:app --host 0.0.0.0 --port 8000
+  uvicorn app.main:app --host 0.0.0.0 --port 8010
 ```
 
 If Ollama is unavailable, the server returns cached mock responses and the UI

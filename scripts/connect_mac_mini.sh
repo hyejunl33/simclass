@@ -14,7 +14,7 @@ echo "== ping =="
 ping -c 1 -W 2 "$HOST"
 
 echo "== health =="
-curl -fsS "http://$HOST:8000/health"
+curl -fsS "http://$HOST:8010/health"
 
 echo
 echo "== ssh =="
@@ -25,4 +25,4 @@ else
 fi
 
 echo
-echo "Next: set app/processing/SimClass/data/server.txt to http://$HOST:8000"
+echo "Next: set app/processing/SimClass/data/server.txt to http://$HOST:8010"

@@ -7,7 +7,7 @@ sketch on the laptop. The demo stays on the local network; no cloud.
 
 - Mac mini and laptop on the same Wi-Fi/LAN.
 - Laptop finds the Mac mini by IP, e.g. `192.168.0.42`.
-- Port `8000` is open for the FastAPI server.
+- Port `8010` is open for the FastAPI server. Port `8000` is already used by MomentSearch on this Mac mini, so SimClass uses `8010`.
 
 ## 1. On the Mac mini
 
@@ -63,14 +63,14 @@ OLLAMA_MODEL=qwen2.5:3b-instruct-q4_K_M \
 ASR_MODE=mlx \
 TTS_MODE=say \
 TTS_VOICE=Yuna \
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8010
 ```
 
 Test from the Mac mini and from the laptop:
 
 ```bash
-curl http://127.0.0.1:8000/health
-curl http://<mac-mini-ip>:8000/health
+curl http://127.0.0.1:8010/health
+curl http://<mac-mini-ip>:8010/health
 ```
 
 Expected: `{"ok":true,"mode":"mock","version":"0.3.0"}` (the mode field is the
@@ -91,7 +91,7 @@ Edit:
 `app/processing/SimClass/data/server.txt`
 
 ```text
-http://<mac-mini-ip>:8000
+http://<mac-mini-ip>:8010
 ```
 
 Then open `app/processing/SimClass/SimClass.pde` in Processing and run.
@@ -109,7 +109,7 @@ Then open `app/processing/SimClass/SimClass.pde` in Processing and run.
 
 | Symptom | Check |
 |---|---|
-| `연결 실패` | `curl http://<ip>:8000/health` from laptop; firewall; same Wi-Fi |
+| `연결 실패` | `curl http://<ip>:8010/health` from laptop; firewall; same Wi-Fi |
 | `HWP 파싱 실패` | File is HWP/HWPX; server logs; `python-hwpx` installed |
 | `ASR 실패` | `ASR_MODE=mlx`; `mlx-whisper` installed; microphone permission |
 | No student voice | `TTS_MODE=say`; `say -v Yuna` works; TTS endpoint returns audio |
@@ -120,7 +120,7 @@ Then open `app/processing/SimClass/SimClass.pde` in Processing and run.
 
 If the Mac mini is unavailable:
 
-- Keep `server.txt` at `http://127.0.0.1:8000` and run the server locally.
+- Keep `server.txt` at `http://127.0.0.1:8010` and run the server locally.
 - `LLM_MODE=mock`, `ASR_MODE=mock`, `TTS_MODE=mock`.
 - The Processing UI still works with cached/mock responses; the feedback and
   model-quality claims are not part of the fallback demo.

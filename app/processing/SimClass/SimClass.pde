@@ -23,7 +23,7 @@ import processing.data.JSONObject;
 // SimClass — Processing client (MVP + HWP ingest)
 // Sends a teacher utterance to FastAPI and renders mock student responses.
 
-String SERVER_BASE = "http://127.0.0.1:8000";
+String SERVER_BASE = "http://127.0.0.1:8010";
 final String LESSON_ID = "objects-meaning";
 final String PHASE_ID = "concept";
 

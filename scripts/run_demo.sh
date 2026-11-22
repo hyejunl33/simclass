@@ -6,4 +6,4 @@ if [ ! -d .venv ]; then
   .venv/bin/pip install -r requirements.txt
 fi
 source .venv/bin/activate
-exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8010
