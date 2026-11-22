@@ -9,6 +9,15 @@ sketch on the laptop. The demo stays on the local network; no cloud.
 - Laptop finds the Mac mini by IP, e.g. `192.168.0.42`.
 - Port `8010` is open for the FastAPI server. Port `8000` is already used by MomentSearch on this Mac mini, so SimClass uses `8010`.
 
+## Fast path
+
+After the prerequisites below:
+
+```bash
+cd simclass
+SIMCLASS_MODE=full scripts/start_server.sh
+```
+
 ## 1. On the Mac mini
 
 ### Enable SSH and find the IP

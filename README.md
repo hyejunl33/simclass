@@ -51,7 +51,30 @@ lesson is the first fixture. Use `PUT /api/lesson/{id}` to save a reviewed spec.
 `PUT /api/personas/{id}` saves edits. In the Processing demo, load an HWP, then
 click a student card to cycle its misconception and persist the change.
 
-## Quick start (MVP, mock LLM)
+## Quick start
+
+```bash
+git clone https://github.com/hyejunl33/simclass.git
+cd simclass
+
+# laptop-only demo with cached responses
+SIMCLASS_MODE=mock scripts/start_server.sh
+
+# or on the Mac mini with Ollama + MLX Whisper + say
+SIMCLASS_MODE=full scripts/start_server.sh
+```
+
+Point `app/processing/SimClass/data/server.txt` at the server, then:
+
+```bash
+scripts/run_processing.sh run
+```
+
+Full instructions: [`docs/runbook.md`](docs/runbook.md). If the server is
+unreachable, the Processing app automatically switches to cached lesson,
+personas, and student turns, so the classroom flow still runs.
+
+Manual server start:
 
 ```bash
 cd server
@@ -60,13 +83,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8010
 ```
-
-Open `app/processing/SimClass/SimClass.pde` in Processing and run it. Type a
-teacher question and press Enter. The mock server returns three student
-responses so the UI loop can be tested without a model. Use the "HWP 수업안
-불러오기" button to upload a lesson plan and see the parsed summary. The mock
-server returns a `LessonSpec`; the UI shows the topic, phase count, duration, and
-whether review is needed.
 
 ## 40-minute session + replay
 
@@ -126,14 +142,17 @@ See [docs/mac_mini_setup.md](docs/mac_mini_setup.md) and
 
 ## Docs
 
+- [`docs/runbook.md`](docs/runbook.md) — clean-checkout demo runbook
 - [`docs/spec.md`](docs/spec.md) — product and implementation spec
 - [`docs/rubric.md`](docs/rubric.md) — lesson-demonstration rubric and evidence rules
 - [`docs/ws_protocol.md`](docs/ws_protocol.md) — message contract
 - [`docs/mac_mini_setup.md`](docs/mac_mini_setup.md) — Mac mini runtime + laptop connection
 - [`docs/session_flow.md`](docs/session_flow.md) — 40-minute phases, session API, replay
 - [`docs/judge.md`](docs/judge.md) — two-stage rubric judge, evidence rules, human validation
+- [`docs/validation_checklist.md`](docs/validation_checklist.md) — two-rater checklist and kappa
 - [`fixtures/lesson_plans/objects_meaning.json`](fixtures/lesson_plans/objects_meaning.json) — 즐생 lesson fixture
 - [`fixtures/personas/objects_meaning.json`](fixtures/personas/objects_meaning.json) — three persona fixture
+- [`fixtures/sessions/`](fixtures/sessions) — sample 40-minute session, report JSON, and Markdown
 
 ## Status
 

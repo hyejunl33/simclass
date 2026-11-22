@@ -1,0 +1,750 @@
+{
+  "id": "sample-objects-meaning-3",
+  "lesson_id": "objects-meaning",
+  "topic": "물건의 의미는 무엇일까요?",
+  "duration_sec": 2400.0,
+  "planned_sec": 2400,
+  "completed": true,
+  "phases": [
+    {
+      "id": "intro",
+      "name": "학습 문제 확인",
+      "planned_min": 5,
+      "actual_sec": 581.8,
+      "entries": 4
+    },
+    {
+      "id": "concept",
+      "name": "개념 형성",
+      "planned_min": 17,
+      "actual_sec": 872.7,
+      "entries": 6
+    },
+    {
+      "id": "interpretation",
+      "name": "자료 해석",
+      "planned_min": 12,
+      "actual_sec": 387.9,
+      "entries": 2
+    },
+    {
+      "id": "application",
+      "name": "원리 적용",
+      "planned_min": 6,
+      "actual_sec": 557.6,
+      "entries": 4
+    }
+  ],
+  "transcript": [
+    {
+      "t": 218.2,
+      "phase_id": "intro",
+      "phase_name": "학습 문제 확인",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "지난 시간에 토끼에게 어떤 선물을 주었나요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 3.4,
+      "kt": {
+        "harin": {
+          "kc1": 0.55,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.752,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 218.2,
+      "phase_id": "intro",
+      "phase_name": "학습 문제 확인",
+      "speaker": "student",
+      "name": "준서",
+      "text": "토끼에게 선물을 주면 그 선물의 의미가 국어사전에 나오는 뜻이 아니라고 생각해요.",
+      "student_id": "junseo",
+      "state": "thinking|confident",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.55,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.752,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 484.8,
+      "phase_id": "intro",
+      "phase_name": "학습 문제 확인",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "왜 오래된 연필이 더 의미 있었을까요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 2.8,
+      "kt": {
+        "harin": {
+          "kc1": 0.55,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.384,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 484.8,
+      "phase_id": "intro",
+      "phase_name": "학습 문제 확인",
+      "speaker": "student",
+      "name": "준서",
+      "text": "저는 더 비싼 것 같아서 의미 있었을 것 같아요.",
+      "student_id": "junseo",
+      "state": "confident",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.55,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.384,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 824.2,
+      "phase_id": "concept",
+      "phase_name": "개념 형성",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "물건의 의미는 무엇일까요? 왜 그렇게 생각했어요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 3.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.384,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 824.2,
+      "phase_id": "concept",
+      "phase_name": "개념 형성",
+      "speaker": "student",
+      "name": "하린",
+      "text": "물건의 의미는 사람마다 다르다고 생각해요. 국어사전에 나오는 뜻만으로는 너무 간단하다고 생각해요.",
+      "student_id": "harin",
+      "state": "confident",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.384,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1090.9,
+      "phase_id": "concept",
+      "phase_name": "개념 형성",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "하린이 말에 이어서 준서는 어떻게 생각하나요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 3.2,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.777,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1090.9,
+      "phase_id": "concept",
+      "phase_name": "개념 형성",
+      "speaker": "student",
+      "name": "준서",
+      "text": "저는 소중한 것은 비싼 것을 의미하는 거라고 생각해요.",
+      "student_id": "junseo",
+      "state": "confident|thinking",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.777,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1357.6,
+      "phase_id": "concept",
+      "phase_name": "개념 형성",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "민지의 경험과 연결해 볼까요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 2.6,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.777,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1357.6,
+      "phase_id": "concept",
+      "phase_name": "개념 형성",
+      "speaker": "student",
+      "name": "민지",
+      "text": "친구가 비싸지 않아도 친구라는 말은 좋았어요.",
+      "student_id": "minji",
+      "state": "thinking|confused|confident",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.777,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1745.5,
+      "phase_id": "interpretation",
+      "phase_name": "자료 해석",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "사진 속 물건과 내 경험을 연결해 볼까요? 어떻게 알 수 있을까요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 3.8,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1745.5,
+      "phase_id": "interpretation",
+      "phase_name": "자료 해석",
+      "speaker": "student",
+      "name": "준서",
+      "text": "물건의 의미는 어떻게 알 수 있을까요? 국어사전이나 상황에서 물건을 쓰는 사람의 입장에서 생각해보면 알 수 있을 것 같아요.",
+      "student_id": "junseo",
+      "state": "thinking|confident",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 2036.4,
+      "phase_id": "application",
+      "phase_name": "원리 적용",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "내 물건의 소중한 순서를 정해 볼까요? 친구와 비교해 볼까요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 3.5,
+      "kt": {
+        "harin": {
+          "kc1": 0.972,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 2036.4,
+      "phase_id": "application",
+      "phase_name": "원리 적용",
+      "speaker": "student",
+      "name": "하린",
+      "text": "내 물건의 순서는 국어사전에 나오는 뜻이 아니라, 내 마음대로 정할 수 있어요.",
+      "student_id": "harin",
+      "state": "confident",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.972,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 2303.0,
+      "phase_id": "application",
+      "phase_name": "원리 적용",
+      "speaker": "teacher",
+      "name": "교사",
+      "text": "오늘 배운 것을 스스로 정리해 볼까요?",
+      "student_id": "",
+      "state": "",
+      "audio_sec": 2.9,
+      "kt": {
+        "harin": {
+          "kc1": 0.841,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 2303.0,
+      "phase_id": "application",
+      "phase_name": "원리 적용",
+      "speaker": "student",
+      "name": "하린",
+      "text": "물건의 의미는 물건을 이해하는 데 필요한 뜻을 말하는 거 같습니다.",
+      "student_id": "harin",
+      "state": "thinking",
+      "audio_sec": 0.0,
+      "kt": {
+        "harin": {
+          "kc1": 0.841,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    }
+  ],
+  "kt_timeline": [
+    {
+      "t": 218.2,
+      "phase_id": "intro",
+      "kt": {
+        "harin": {
+          "kc1": 0.55,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.752,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 484.8,
+      "phase_id": "intro",
+      "kt": {
+        "harin": {
+          "kc1": 0.55,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.384,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 824.2,
+      "phase_id": "concept",
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.384,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1090.9,
+      "phase_id": "concept",
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.777,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.15,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1357.6,
+      "phase_id": "concept",
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.777,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 1745.5,
+      "phase_id": "interpretation",
+      "kt": {
+        "harin": {
+          "kc1": 0.869,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 2036.4,
+      "phase_id": "application",
+      "kt": {
+        "harin": {
+          "kc1": 0.972,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    },
+    {
+      "t": 2303.0,
+      "phase_id": "application",
+      "kt": {
+        "harin": {
+          "kc1": 0.841,
+          "kc2": 0.45,
+          "kc3": 0.35,
+          "kc4": 0.3
+        },
+        "junseo": {
+          "kc1": 0.949,
+          "kc2": 0.3,
+          "kc3": 0.25,
+          "kc4": 0.2
+        },
+        "minji": {
+          "kc1": 0.2,
+          "kc2": 0.25,
+          "kc3": 0.168,
+          "kc4": 0.1
+        }
+      }
+    }
+  ],
+  "final_kt": {
+    "harin": {
+      "kc1": 0.841,
+      "kc2": 0.45,
+      "kc3": 0.35,
+      "kc4": 0.3
+    },
+    "junseo": {
+      "kc1": 0.949,
+      "kc2": 0.3,
+      "kc3": 0.25,
+      "kc4": 0.2
+    },
+    "minji": {
+      "kc1": 0.2,
+      "kc2": 0.25,
+      "kc3": 0.168,
+      "kc4": 0.1
+    }
+  }
+}

@@ -516,3 +516,21 @@ def test_delivery_is_na_without_voice():
     domain = _delivery_domain(transcript)
     assert domain.status == "not_assessed"
     assert domain.score is None
+
+
+def test_sample_session_fixtures_are_served():
+    replay = client.get("/api/sample/replay")
+    assert replay.status_code == 200, replay.text
+    body = replay.json()
+    assert body["lesson_id"] == "objects-meaning"
+    assert len(body["transcript"]) >= 8
+    assert body["completed"] is True
+
+    report = client.get("/api/sample/report")
+    assert report.status_code == 200, report.text
+    assert report.json()["mode"] == "ollama"
+
+    md = client.get("/api/sample/report.md")
+    assert md.status_code == 200, md.text
+    assert "SimClass 수업실연 피드백" in md.text
+    assert "공식 채점표가 아닙니다" in md.text

@@ -52,6 +52,7 @@ from .tts import synthesize
 
 ROOT = Path(__file__).resolve().parents[2]
 LESSON_DIR = ROOT / "fixtures" / "lesson_plans"
+SAMPLE_DIR = ROOT / "fixtures" / "sessions"
 
 app = FastAPI(title="SimClass", version="0.5.0")
 REVIEWED_LESSONS: dict[str, LessonSpec] = {}
@@ -244,6 +245,24 @@ def submit_human_coding(session_id: str, coding: HumanCoding) -> dict[str, Any]:
 @app.get("/api/validation/agreement")
 def get_agreement() -> dict[str, Any]:
     return agreement()
+
+
+@app.get("/api/sample/replay")
+def sample_replay() -> dict[str, Any]:
+    return load_json(SAMPLE_DIR / "sample_objects_meaning.replay.json")
+
+
+@app.get("/api/sample/report")
+def sample_report() -> dict[str, Any]:
+    return load_json(SAMPLE_DIR / "sample_objects_meaning.report.json")
+
+
+@app.get("/api/sample/report.md", response_class=PlainTextResponse)
+def sample_report_markdown() -> str:
+    path = SAMPLE_DIR / "sample_objects_meaning.report.md"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Sample report not found")
+    return path.read_text(encoding="utf-8")
 
 
 @app.post("/api/asr", response_model=ASRResponse)
