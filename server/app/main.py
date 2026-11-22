@@ -8,14 +8,20 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .lesson_ingest import decode_ingest
-from .models import IngestRequest, LessonSpec
+from .models import (
+    GeneratePersonasRequest,
+    IngestRequest,
+    LessonSpec,
+    PersonaSet,
+)
+from .personas import generate_personas
 
 ROOT = Path(__file__).resolve().parents[2]
 LESSON_DIR = ROOT / "fixtures" / "lesson_plans"
-PERSONA_DIR = ROOT / "fixtures" / "personas"
 
-app = FastAPI(title="SimClass", version="0.2.0")
+app = FastAPI(title="SimClass", version="0.3.0")
 REVIEWED_LESSONS: dict[str, LessonSpec] = {}
+PERSONA_SETS: dict[str, PersonaSet] = {}
 
 
 class TurnRequest(BaseModel):
@@ -52,8 +58,12 @@ def load_lesson(lesson_id: str) -> LessonSpec:
     return LessonSpec(**load_json(LESSON_DIR / f"{lesson_id.replace('-', '_')}.json"))
 
 
-def load_personas(lesson_id: str) -> dict[str, Any]:
-    return load_json(PERSONA_DIR / f"{lesson_id.replace('-', '_')}.json")
+def load_personas(lesson_id: str) -> PersonaSet:
+    if lesson_id in PERSONA_SETS:
+        return PERSONA_SETS[lesson_id]
+    ps = generate_personas(load_lesson(lesson_id))
+    PERSONA_SETS[lesson_id] = ps
+    return ps
 
 
 MOCK_LINES = {
@@ -65,7 +75,7 @@ MOCK_LINES = {
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "mode": "mock", "version": "0.2.0"}
+    return {"ok": True, "mode": "mock", "version": "0.3.0"}
 
 
 @app.get("/api/lesson/{lesson_id}", response_model=LessonSpec)
@@ -89,16 +99,38 @@ def review_lesson(lesson_id: str, spec: LessonSpec) -> LessonSpec:
     return spec
 
 
-@app.get("/api/personas/{lesson_id}")
-def get_personas(lesson_id: str) -> dict[str, Any]:
+@app.get("/api/personas/{lesson_id}", response_model=PersonaSet)
+def get_personas(lesson_id: str) -> PersonaSet:
     return load_personas(lesson_id)
+
+
+@app.post("/api/personas/generate", response_model=PersonaSet)
+def generate_personas_endpoint(req: GeneratePersonasRequest) -> PersonaSet:
+    lesson = load_lesson(req.lesson_id)
+    if not lesson.knowledge_components:
+        raise HTTPException(status_code=400, detail="Lesson has no knowledge components")
+    ps = generate_personas(lesson)
+    PERSONA_SETS[ps.lesson_id] = ps
+    return ps
+
+
+@app.put("/api/personas/{lesson_id}", response_model=PersonaSet)
+def review_personas(lesson_id: str, ps: PersonaSet) -> PersonaSet:
+    if ps.lesson_id != lesson_id:
+        raise HTTPException(status_code=400, detail="Lesson ID mismatch")
+    if len(ps.personas) != 3:
+        raise HTTPException(status_code=400, detail="Exactly three personas are required")
+    if len({p.id for p in ps.personas}) != 3:
+        raise HTTPException(status_code=400, detail="Persona IDs must be unique")
+    PERSONA_SETS[lesson_id] = ps
+    return ps
 
 
 @app.post("/api/turn", response_model=TurnResponse)
 def turn(req: TurnRequest) -> TurnResponse:
     load_lesson(req.lesson_id)
-    persona_data = load_personas(req.lesson_id)
-    personas = persona_data["personas"]
+    persona_set = load_personas(req.lesson_id)
+    personas = [p.model_dump() for p in persona_set.personas]
     if req.persona_ids:
         personas = [p for p in personas if p["id"] in req.persona_ids]
     if not personas:

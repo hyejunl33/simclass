@@ -45,3 +45,23 @@ class LessonSpec(BaseModel):
 class IngestRequest(BaseModel):
     filename: str
     data_base64: str
+
+
+class Persona(BaseModel):
+    id: str
+    name: str
+    prior_knowledge: str = "중간"
+    misconception_id: str = ""
+    misconception: str = ""
+    confidence: str = "중간"
+    speech_style: str = ""
+    initial_mastery: dict[str, float] = {}
+
+
+class PersonaSet(BaseModel):
+    lesson_id: str
+    personas: list[Persona]
+
+
+class GeneratePersonasRequest(BaseModel):
+    lesson_id: str = "objects-meaning"

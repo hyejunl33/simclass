@@ -47,6 +47,10 @@ LLM judge produces rubric-based feedback with evidence quotes.
 materials, notes, knowledge components, and misconceptions. The attached 즐생
 lesson is the first fixture. Use `PUT /api/lesson/{id}` to save a reviewed spec.
 
+`POST /api/personas/generate` creates three personas from the lesson;
+`PUT /api/personas/{id}` saves edits. In the Processing demo, load an HWP, then
+click a student card to cycle its misconception and persist the change.
+
 ## Quick start (MVP, mock LLM)
 
 ```bash
@@ -74,4 +78,6 @@ whether review is needed.
 
 ## Status
 
-Early scaffold. See GitHub issues for the ticket graph.
+Scaffold + lesson ingest + persona generation/editing are implemented. See
+GitHub issues for the ticket graph; the next slice is the real local LLM turn
+loop (issue #5).

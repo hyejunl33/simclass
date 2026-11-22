@@ -94,3 +94,21 @@ def test_review_lesson_roundtrip():
     assert r.status_code == 200, r.text
     assert r.json()["topic"] == "수정된 주제"
     assert client.get("/api/lesson/objects-meaning").json()["topic"] == "수정된 주제"
+
+
+def test_generate_personas_for_lesson():
+    r = client.post("/api/personas/generate", json={"lesson_id": "objects-meaning"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["personas"]) == 3
+    assert all(p["misconception"] for p in body["personas"])
+    assert {p["id"] for p in body["personas"]} == {"harin", "junseo", "minji"}
+
+
+def test_review_personas_roundtrip():
+    body = client.post("/api/personas/generate", json={"lesson_id": "objects-meaning"}).json()
+    body["personas"][0]["misconception"] = "의미는 그냥 사전 뜻이다."
+    r = client.put("/api/personas/objects-meaning", json=body)
+    assert r.status_code == 200, r.text
+    saved = client.get("/api/personas/objects-meaning").json()
+    assert saved["personas"][0]["misconception"] == "의미는 그냥 사전 뜻이다."

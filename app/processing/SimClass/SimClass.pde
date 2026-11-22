@@ -22,6 +22,8 @@ String input = "";
 String status = "발문을 입력하고 Enter를 누르세요.";
 String lessonTopic = "물건의 의미는 무엇일까요?";
 String lessonSummary = "HWP를 불러오면 수업안 요약이 표시됩니다.";
+String lessonId = "objects-meaning";
+ArrayList<String> misconceptionOptions = new ArrayList<String>();
 boolean sending = false;
 
 ArrayList<StudentView> students = new ArrayList<StudentView>();
@@ -145,6 +147,18 @@ void mousePressed() {
     selectInput("HWP 수업안 선택", "hwpSelected");
     return;
   }
+  // Click a student card to cycle its misconception.
+  if (mouseY > 116 && mouseY < 258) {
+    int idx = floor((mouseX - 36) / 350);
+    if (idx >= 0 && idx < students.size() && misconceptionOptions.size() > 0) {
+      StudentView s = students.get(idx);
+      int current = misconceptionOptions.indexOf(s.misconception);
+      s.misconception = misconceptionOptions.get((current + 1) % misconceptionOptions.size());
+      savePersonas();
+      status = s.name + "의 오개념을 바꿨습니다.";
+      return;
+    }
+  }
   if (mouseX > 910 && mouseX < 1064 && mouseY > 632 && mouseY < 680) {
     sendTurn();
   }
@@ -162,16 +176,79 @@ void hwpSelected(File selection) {
       payload.setString("data_base64", encoded);
       String response = postJson(INGEST_URL, payload.toString());
       JSONObject lesson = parseJSONObject(response);
+      lessonId = lesson.getString("id");
       lessonTopic = lesson.getString("topic");
       int phases = lesson.getJSONArray("phases").size();
       int minutes = lesson.getInt("duration_min");
       lessonSummary = phases + "단계 · " + minutes + "분 · 학생 3명";
+
+      // Refresh misconception choices and generate personas.
+      misconceptionOptions.clear();
+      JSONArray ms = lesson.getJSONArray("misconceptions");
+      for (int i = 0; i < ms.size(); i++) {
+        misconceptionOptions.add(ms.getJSONObject(i).getString("text"));
+      }
+      JSONObject pReq = new JSONObject();
+      pReq.setString("lesson_id", lessonId);
+      JSONObject pRes = parseJSONObject(
+          postJson(SERVER_BASE + "/api/personas/generate", pReq.toString()));
+      JSONArray ps = pRes.getJSONArray("personas");
+      students.clear();
+      for (int i = 0; i < ps.size(); i++) {
+        JSONObject p = ps.getJSONObject(i);
+        StudentView sv = new StudentView(
+            p.getString("id"),
+            p.getString("name"),
+            p.getString("misconception"),
+            "thinking",
+            0.5);
+        sv.priorKnowledge = p.getString("prior_knowledge");
+        sv.confidence = p.getString("confidence");
+        sv.speechStyle = p.getString("speech_style");
+        try {
+          JSONObject m = p.getJSONObject("initial_mastery");
+          for (Object key : m.keys()) {
+            sv.mastery = m.getFloat((String) key);
+            break;
+          }
+        } catch (Exception ignored) {}
+        students.add(sv);
+      }
+
       status = "수업안 파싱 완료" + (lesson.getBoolean("needs_review") ? " · 검토 필요" : "");
       transcript.add("[수업안] " + lessonTopic);
     } catch (Exception e) {
       status = "HWP 파싱 실패: " + e.getMessage();
     }
   });
+}
+
+void savePersonas() {
+  if (students.size() == 0) return;
+  try {
+    JSONObject payload = new JSONObject();
+    payload.setString("lesson_id", lessonId);
+    JSONArray arr = new JSONArray();
+    for (int i = 0; i < students.size(); i++) {
+      StudentView s = students.get(i);
+      JSONObject p = new JSONObject();
+      p.setString("id", s.id);
+      p.setString("name", s.name);
+      p.setString("prior_knowledge", s.priorKnowledge);
+      p.setString("misconception_id", "");
+      p.setString("misconception", s.misconception);
+      p.setString("confidence", s.confidence);
+      p.setString("speech_style", s.speechStyle);
+      JSONObject m = new JSONObject();
+      m.setFloat("kc1", s.mastery);
+      p.setJSONObject("initial_mastery", m);
+      arr.append(p);
+    }
+    payload.setJSONArray("personas", arr);
+    requestJson("PUT", SERVER_BASE + "/api/personas/" + lessonId, payload.toString());
+  } catch (Exception e) {
+    status = "페르소나 저장 실패: " + e.getMessage();
+  }
 }
 
 void sendTurn() {
@@ -214,8 +291,12 @@ void sendTurn() {
 }
 
 String postJson(String url, String body) throws Exception {
+  return requestJson("POST", url, body);
+}
+
+String requestJson(String method, String url, String body) throws Exception {
   HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-  conn.setRequestMethod("POST");
+  conn.setRequestMethod(method);
   conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
   conn.setDoOutput(true);
   byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
@@ -247,6 +328,9 @@ class StudentView {
   String misconception;
   String state;
   float mastery;
+  String priorKnowledge = "중간";
+  String confidence = "중간";
+  String speechStyle = "";
 
   StudentView(String id, String name, String misconception, String state, float mastery) {
     this.id = id;
