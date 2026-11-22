@@ -5,18 +5,23 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import processing.data.JSONArray;
 import processing.data.JSONObject;
 
-// SimClass — Processing client (MVP)
+// SimClass — Processing client (MVP + HWP ingest)
 // Sends a teacher utterance to FastAPI and renders mock student responses.
 
-final String SERVER_URL = "http://127.0.0.1:8000/api/turn";
+final String SERVER_BASE = "http://127.0.0.1:8000";
+final String TURN_URL = SERVER_BASE + "/api/turn";
+final String INGEST_URL = SERVER_BASE + "/api/lesson/ingest";
 final String LESSON_ID = "objects-meaning";
 final String PHASE_ID = "concept";
 
 String input = "";
 String status = "발문을 입력하고 Enter를 누르세요.";
+String lessonTopic = "물건의 의미는 무엇일까요?";
+String lessonSummary = "HWP를 불러오면 수업안 요약이 표시됩니다.";
 boolean sending = false;
 
 ArrayList<StudentView> students = new ArrayList<StudentView>();
@@ -36,18 +41,30 @@ void draw() {
   // Header
   fill(30, 35, 45);
   textSize(26);
-  text("SimClass · 즐생 수업 리허설", 36, 52);
+  text("SimClass · 즐생 수업 리허설", 36, 48);
+  textSize(15);
+  fill(70, 78, 90);
+  text(lessonTopic, 36, 74, 820, 24);
+  textSize(12);
+  fill(120, 128, 140);
+  text(lessonSummary + "  ·  Phase: 개념 형성", 36, 96, 820, 20);
+
+  // HWP upload button
+  fill(245, 247, 250);
+  stroke(200, 205, 215);
+  rect(884, 22, 180, 42, 10);
+  noStroke();
+  fill(50, 90, 180);
   textSize(14);
-  fill(100, 108, 120);
-  text("Lesson: 물건의 의미는 무엇일까요?  ·  Phase: 개념 형성", 36, 78);
+  text("HWP 수업안 불러오기", 898, 48);
 
   // Student cards
   for (int i = 0; i < students.size(); i++) {
     StudentView s = students.get(i);
     float x = 36 + i * 350;
-    float y = 104;
+    float y = 116;
     float w = 320;
-    float h = 150;
+    float h = 142;
 
     fill(255);
     stroke(225, 228, 234);
@@ -57,22 +74,21 @@ void draw() {
     noStroke();
     fill(30, 35, 45);
     textSize(20);
-    text(s.name, x + 20, y + 34);
+    text(s.name, x + 20, y + 32);
 
     fill(stateColor(s.state));
     textSize(13);
-    text(s.state, x + 20, y + 58);
+    text(s.state, x + 20, y + 55);
 
     fill(90, 98, 110);
     textSize(13);
-    text("오개념: " + s.misconception, x + 20, y + 84);
-    text("mastery: " + nf((float)s.mastery, 1, 2), x + 20, y + 106);
+    text("오개념: " + s.misconception, x + 20, y + 80);
+    text("mastery: " + nf((float)s.mastery, 1, 2), x + 20, y + 102);
 
-    // mastery bar
     fill(232, 235, 240);
-    rect(x + 20, y + 118, w - 40, 8, 4);
+    rect(x + 20, y + 114, w - 40, 8, 4);
     fill(80, 130, 220);
-    rect(x + 20, y + 118, (w - 40) * (float)s.mastery, 8, 4);
+    rect(x + 20, y + 114, (w - 40) * (float)s.mastery, 8, 4);
   }
 
   // Transcript
@@ -101,7 +117,7 @@ void draw() {
   textSize(16);
   text(input + (frameCount / 30 % 2 == 0 ? "|" : ""), 52, 662);
 
-  // Button
+  // Send button
   fill(sending ? color(160, 170, 185) : color(50, 90, 180));
   rect(910, 632, 154, 48, 10);
   fill(255);
@@ -125,9 +141,37 @@ void keyTyped() {
 }
 
 void mousePressed() {
+  if (mouseX > 884 && mouseX < 1064 && mouseY > 22 && mouseY < 64) {
+    selectInput("HWP 수업안 선택", "hwpSelected");
+    return;
+  }
   if (mouseX > 910 && mouseX < 1064 && mouseY > 632 && mouseY < 680) {
     sendTurn();
   }
+}
+
+void hwpSelected(File selection) {
+  if (selection == null) return;
+  status = "HWP를 읽는 중...";
+  thread(() -> {
+    try {
+      byte[] bytes = loadBytes(selection.getAbsolutePath());
+      String encoded = Base64.getEncoder().encodeToString(bytes);
+      JSONObject payload = new JSONObject();
+      payload.setString("filename", selection.getName());
+      payload.setString("data_base64", encoded);
+      String response = postJson(INGEST_URL, payload.toString());
+      JSONObject lesson = parseJSONObject(response);
+      lessonTopic = lesson.getString("topic");
+      int phases = lesson.getJSONArray("phases").size();
+      int minutes = lesson.getInt("duration_min");
+      lessonSummary = phases + "단계 · " + minutes + "분 · 학생 3명";
+      status = "수업안 파싱 완료" + (lesson.getBoolean("needs_review") ? " · 검토 필요" : "");
+      transcript.add("[수업안] " + lessonTopic);
+    } catch (Exception e) {
+      status = "HWP 파싱 실패: " + e.getMessage();
+    }
+  });
 }
 
 void sendTurn() {
@@ -145,31 +189,8 @@ void sendTurn() {
       payload.setString("lesson_id", LESSON_ID);
       payload.setString("phase_id", PHASE_ID);
       payload.setString("teacher_utterance", utterance);
-
-      HttpURLConnection conn = (HttpURLConnection) new URL(SERVER_URL).openConnection();
-      conn.setRequestMethod("POST");
-      conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-      conn.setDoOutput(true);
-      byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
-      try (OutputStream os = conn.getOutputStream()) {
-        os.write(body);
-      }
-
-      int code = conn.getResponseCode();
-      if (code != 200) {
-        status = "서버 오류: HTTP " + code;
-        sending = false;
-        return;
-      }
-
-      StringBuilder sb = new StringBuilder();
-      try (BufferedReader br = new BufferedReader(
-          new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-        String line;
-        while ((line = br.readLine()) != null) sb.append(line);
-      }
-
-      JSONObject res = parseJSONObject(sb.toString());
+      String response = postJson(TURN_URL, payload.toString());
+      JSONObject res = parseJSONObject(response);
       JSONArray arr = res.getJSONArray("students");
       for (int i = 0; i < arr.size(); i++) {
         JSONObject s = arr.getJSONObject(i);
@@ -190,6 +211,28 @@ void sendTurn() {
       sending = false;
     }
   });
+}
+
+String postJson(String url, String body) throws Exception {
+  HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+  conn.setRequestMethod("POST");
+  conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+  conn.setDoOutput(true);
+  byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+  try (OutputStream os = conn.getOutputStream()) {
+    os.write(bytes);
+  }
+  int code = conn.getResponseCode();
+  if (code != 200) {
+    throw new RuntimeException("HTTP " + code);
+  }
+  StringBuilder sb = new StringBuilder();
+  try (BufferedReader br = new BufferedReader(
+      new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+    String line;
+    while ((line = br.readLine()) != null) sb.append(line);
+  }
+  return sb.toString();
 }
 
 color stateColor(String state) {

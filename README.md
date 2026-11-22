@@ -40,6 +40,13 @@ LLM judge produces rubric-based feedback with evidence quotes.
   - macOS `say` TTS
 ```
 
+## Lesson ingest
+
+`POST /api/lesson/ingest` accepts a base64-encoded HWP/HWPX file and returns a
+`LessonSpec` with phases, activities, teacher questions, expected responses,
+materials, notes, knowledge components, and misconceptions. The attached 즐생
+lesson is the first fixture. Use `PUT /api/lesson/{id}` to save a reviewed spec.
+
 ## Quick start (MVP, mock LLM)
 
 ```bash
@@ -52,7 +59,10 @@ uvicorn app.main:app --reload --port 8000
 
 Open `app/processing/SimClass/SimClass.pde` in Processing and run it. Type a
 teacher question and press Enter. The mock server returns three student
-responses so the UI loop can be tested without a model.
+responses so the UI loop can be tested without a model. Use the "HWP 수업안
+불러오기" button to upload a lesson plan and see the parsed summary. The mock
+server returns a `LessonSpec`; the UI shows the topic, phase count, duration, and
+whether review is needed.
 
 ## Docs
 

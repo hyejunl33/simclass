@@ -48,3 +48,49 @@ def test_turn_returns_students_and_kt():
 def test_unknown_lesson_is_404():
     r = client.get("/api/lesson/does-not-exist")
     assert r.status_code == 404
+
+
+import base64
+from pathlib import Path
+
+import pytest
+
+LOCAL_LESSON = Path("/home/hy3jun/문서/카카오톡 받은 파일/지도안 2차 러프 초안.hwp")
+
+
+@pytest.mark.skipif(not LOCAL_LESSON.exists(), reason="local lesson plan fixture not present")
+def test_ingest_attached_lesson_plan():
+    raw = LOCAL_LESSON.read_bytes()
+    r = client.post(
+        "/api/lesson/ingest",
+        json={
+            "filename": LOCAL_LESSON.name,
+            "data_base64": base64.b64encode(raw).decode("ascii"),
+        },
+    )
+    assert r.status_code == 200, r.text
+    lesson = r.json()
+    assert lesson["unit"] == "1-2-약속"
+    assert "의미" in lesson["topic"]
+    assert len(lesson["phases"]) == 4
+    assert sum(p["minutes"] for p in lesson["phases"]) == 40
+    assert len(lesson["knowledge_components"]) == 4
+    assert len(lesson["misconceptions"]) >= 3
+    assert lesson["needs_review"] is False
+
+
+def test_ingest_rejects_garbage():
+    r = client.post(
+        "/api/lesson/ingest",
+        json={"filename": "x.hwp", "data_base64": "aGVsbG8="},
+    )
+    assert r.status_code == 400
+
+
+def test_review_lesson_roundtrip():
+    lesson = client.get("/api/lesson/objects-meaning").json()
+    lesson["topic"] = "수정된 주제"
+    r = client.put("/api/lesson/objects-meaning", json=lesson)
+    assert r.status_code == 200, r.text
+    assert r.json()["topic"] == "수정된 주제"
+    assert client.get("/api/lesson/objects-meaning").json()["topic"] == "수정된 주제"
