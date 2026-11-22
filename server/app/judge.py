@@ -122,8 +122,14 @@ def _clean_quote(quote: str) -> str:
 
 
 def _quote_in_entry(quote: str, entry: TranscriptEntry) -> bool:
-    q = _norm(_clean_quote(quote))
-    return len(q) >= 2 and q in _norm(entry.text)
+    cleaned = _clean_quote(quote)
+    variants = [cleaned, re.sub(r"\s*\([^()]*\)\s*$", "", cleaned)]
+    target = _norm(entry.text)
+    for variant in variants:
+        q = _norm(variant)
+        if len(q) >= 2 and q in target:
+            return True
+    return False
 
 
 def _find_quote(
@@ -381,6 +387,9 @@ Rules:
 - 0 = not observed, 1 = emerging, 2 = adequate, 3 = strong.
 - Every score above 0 needs at least one evidence quote that appears verbatim in the transcript.
 - Use turn_id from the transcript brackets.
+- Copy only the utterance text: no speaker label, no phase name.
+- Evidence for structure, questioning, assessment, and conditions must come from a teacher turn.
+- Interaction may cite a teacher or student turn.
 - Do not score visual behavior or audio delivery.
 - Write reasons and improvements in Korean, 1-2 sentences each.
 
@@ -429,6 +438,12 @@ def _validate_llm_domains(
                 rejected.append(quote)
                 errors.append(
                     f"{domain_id}: quote not found in transcript at turn_id {turn_id}: {quote[:60]}"
+                )
+                continue
+            if domain_id != "interaction" and transcript[found].speaker != "teacher":
+                rejected.append(quote)
+                errors.append(
+                    f"{domain_id}: evidence must come from a teacher turn: {quote[:60]}"
                 )
                 continue
             evidence.append(Evidence(turn_id=found, quote=_clean_quote(quote)[:220]))

@@ -432,3 +432,54 @@ def test_judge_accepts_speaker_prefixed_quotes():
     assert _find_quote(transcript, "교사: 지난 시간에 무엇을 배웠나요?", 0) == 0
     assert _find_quote(transcript, "[0] 교사: 지난 시간에 무엇을 배웠나요?", 0) == 0
     assert _find_quote(transcript, "학생(하린): 다른 말", 0) is None
+
+
+def test_judge_rejects_student_evidence_for_teacher_domains():
+    from app.judge import _validate_llm_domains
+    from app.session import TranscriptEntry
+
+    transcript = [
+        TranscriptEntry(
+            t=0, phase_id="concept", phase_name="개념 형성",
+            speaker="teacher", name="교사", text="왜 그렇게 생각했어요?",
+        ),
+        TranscriptEntry(
+            t=1, phase_id="concept", phase_name="개념 형성",
+            speaker="student", name="하린", text="경험 때문이에요.", student_id="harin",
+        ),
+    ]
+    payload = {
+        "domains": [
+            {
+                "id": "structure",
+                "score": 2,
+                "evidence": [{"turn_id": 1, "quote": "경험 때문이에요."}],
+                "reason": "구조", "improvement": "정리",
+            },
+            {
+                "id": "interaction",
+                "score": 2,
+                "evidence": [{"turn_id": 1, "quote": "경험 때문이에요."}],
+                "reason": "상호작용", "improvement": "이름 부르기",
+            },
+        ]
+    }
+    domains, errors, rejected = _validate_llm_domains(payload, transcript)
+    by_id = {d.id: d for d in domains}
+    assert by_id["structure"].score == 0
+    assert by_id["interaction"].score == 2
+    assert "경험 때문이에요." in rejected
+    assert any("teacher turn" in e for e in errors)
+
+
+def test_judge_accepts_quotes_with_phase_suffix():
+    from app.judge import _find_quote
+    from app.session import TranscriptEntry
+
+    transcript = [
+        TranscriptEntry(
+            t=0, phase_id="intro", phase_name="학습 문제 확인",
+            speaker="teacher", name="교사", text="지난 시간에 무엇을 배웠나요?",
+        )
+    ]
+    assert _find_quote(transcript, "교사: 지난 시간에 무엇을 배웠나요? (학습 문제 확인)", 0) == 0
