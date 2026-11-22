@@ -84,8 +84,15 @@ curl http://127.0.0.1:8010/health
 curl http://<mac-mini-ip>:8010/health
 ```
 
-Expected: `{"ok":true,"mode":"mock","version":"0.3.0"}` (the mode field is the
-LLM mode in the health payload; check the server logs for the active adapters).
+Expected (full mode):
+
+```json
+{"ok":true,"mode":"ollama","llm_mode":"ollama","asr_mode":"mlx","tts_mode":"say",
+ "judge_model":"qwen2.5:7b-instruct-q4_K_M","version":"0.5.0"}
+```
+
+In mock mode the three modes are `mock`. The startup banner from
+`scripts/start_server.sh` also prints the selected adapters.
 
 ### Firewall
 
