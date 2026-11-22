@@ -1,0 +1,32 @@
+{
+  "lesson_id": "objects-meaning",
+  "personas": [
+    {
+      "id": "harin",
+      "name": "하린",
+      "prior_knowledge": "높음",
+      "misconception_id": "m1",
+      "confidence": "높음",
+      "speech_style": "또박또박, 논리적으로 말함",
+      "initial_mastery": {"kc1": 0.55, "kc2": 0.45, "kc3": 0.35, "kc4": 0.30}
+    },
+    {
+      "id": "junseo",
+      "name": "준서",
+      "prior_knowledge": "중간",
+      "misconception_id": "m2",
+      "confidence": "높음",
+      "speech_style": "자신 있게 말하지만 근거는 짧음",
+      "initial_mastery": {"kc1": 0.35, "kc2": 0.30, "kc3": 0.25, "kc4": 0.20}
+    },
+    {
+      "id": "minji",
+      "name": "민지",
+      "prior_knowledge": "낮음",
+      "misconception_id": "m3",
+      "confidence": "낮음",
+      "speech_style": "조용하고 짧게 말함",
+      "initial_mastery": {"kc1": 0.20, "kc2": 0.25, "kc3": 0.15, "kc4": 0.10}
+    }
+  ]
+}

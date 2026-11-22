@@ -57,6 +57,8 @@ int phaseIndex = 0;
 boolean replayMode = false;
 boolean feedbackMode = false;
 boolean judging = false;
+boolean offlineMode = false;
+int offlineTurnCount = 0;
 String feedbackSummary = "";
 String reportTextPath = "";
 ArrayList<FeedbackDomain> feedbackDomains = new ArrayList<FeedbackDomain>();
@@ -141,7 +143,8 @@ void draw() {
   fill(90, 98, 110);
   textSize(13);
   PhaseView phase = currentPhase();
-  text("Phase " + (phaseIndex + 1) + "/" + phases.size() + " · " + phase.name, 610, 78, 300, 20);
+  text((offlineMode ? "오프라인 · " : "") + "Phase " + (phaseIndex + 1) + "/" + phases.size()
+      + " · " + phase.name, 610, 78, 320, 20);
 
   fill(sessionEnded ? color(60, 140, 100) : color(50, 90, 180));
   textSize(13);
@@ -519,7 +522,12 @@ void startSession() {
       status = "수업 시작 · " + res.getString("phase_name") + " (" + res.getInt("phase_planned_min") + "분)";
       transcript.add("[수업 시작] " + lessonTopic);
     } catch (Exception e) {
-      status = "세션 시작 실패: " + e.getMessage();
+      offlineMode = true;
+      sessionStartMs = millis();
+      phaseAnchorMs = sessionStartMs;
+      sessionStarted = true;
+      status = "오프라인 세션 시작 · 서버 없이 캐시 응답으로 진행합니다.";
+      transcript.add("[수업 시작] " + lessonTopic + " (오프라인 캐시)");
     }
   }).start();
 }
@@ -547,12 +555,26 @@ void advancePhase() {
         sessionEnded = true;
         status = "세션이 종료되었습니다. 새 세션을 시작하세요.";
       } else {
-        status = "단계 이동 실패: " + msg;
+        offlineMode = true;
+        advanceOffline();
       }
     } finally {
       advancing = false;
     }
   }).start();
+}
+
+void advanceOffline() {
+  if (phaseIndex + 1 < phases.size()) {
+    phaseIndex += 1;
+    phaseAnchorMs = millis();
+    PhaseView p = currentPhase();
+    status = "오프라인 단계 이동 · " + p.name + " (" + p.minutes + "분)";
+    transcript.add("[단계] " + p.name);
+  } else {
+    sessionEnded = true;
+    status = "마지막 단계입니다. [수업 종료] 또는 [리플레이]를 선택하세요.";
+  }
 }
 
 void endSession(boolean loadReplayAfter) {
@@ -574,8 +596,11 @@ void endSession(boolean loadReplayAfter) {
         sessionEnded = true;
         status = "세션이 종료되었습니다. 새 세션을 시작하세요.";
       } else {
-        status = "수업 종료 실패: " + msg;
+        offlineMode = true;
+        sessionEnded = true;
+        status = "오프라인 수업 종료 · 캐시 대화록으로 리플레이합니다.";
       }
+      if (loadReplayAfter) buildOfflineReplay();
     } finally {
       advancing = false;
     }
@@ -632,6 +657,10 @@ void loadReplay() {
 
 void requestJudge() {
   if (!sessionStarted || judging) return;
+  if (offlineMode) {
+    status = "피드백은 Mac mini 서버 연결이 필요합니다. 온라인에서 다시 시도하세요.";
+    return;
+  }
   if (!sessionEnded) {
     endSession(true);
     status = "수업을 종료한 뒤 피드백을 생성합니다.";
@@ -701,9 +730,23 @@ void refreshLessonAsync() {
       applyPersonas(ps.getJSONArray("personas"));
       status = "서버 연결됨 · 수업을 시작할 수 있습니다.";
     } catch (Exception e) {
-      status = "서버 대기 중 · " + e.getMessage();
+      offlineMode = true;
+      loadCachedData();
+      status = "오프라인 캐시 모드 · " + e.getMessage();
     }
   }).start();
+}
+
+void loadCachedData() {
+  try {
+    JSONObject lesson = loadJSONObject("cached_lesson.json");
+    if (lesson != null) applyLesson(lesson);
+    JSONObject ps = loadJSONObject("cached_personas.json");
+    if (ps != null) applyPersonas(ps.getJSONArray("personas"));
+    if (phases.size() == 0) defaultPhases();
+  } catch (Exception e) {
+    status = "캐시 로드 실패: " + e.getMessage();
+  }
 }
 
 void applyLesson(JSONObject lesson) {
@@ -718,17 +761,34 @@ void applyLesson(JSONObject lesson) {
     phases.add(new PhaseView(p.getString("id"), p.getString("name"), p.getInt("minutes")));
   }
   if (phases.size() == 0) defaultPhases();
+
+  JSONArray ms = lesson.getJSONArray("misconceptions");
+  if (ms != null) {
+    misconceptionOptions.clear();
+    misconceptionIds.clear();
+    for (int i = 0; i < ms.size(); i++) {
+      JSONObject m = ms.getJSONObject(i);
+      misconceptionOptions.add(m.getString("text"));
+      misconceptionIds.add(m.getString("id"));
+    }
+  }
 }
 
 void applyPersonas(JSONArray ps) {
   students.clear();
   for (int i = 0; i < ps.size(); i++) {
     JSONObject p = ps.getJSONObject(i);
+    String mtext = p.getString("misconception");
+    if (mtext == null) mtext = "";
+    if (mtext.length() == 0) {
+      int midx = misconceptionIds.indexOf(p.getString("misconception_id"));
+      if (midx >= 0) mtext = misconceptionOptions.get(midx);
+    }
     StudentView sv = new StudentView(
         p.getString("id"),
         p.getString("name"),
         p.getString("misconception_id"),
-        p.getString("misconception"),
+        mtext,
         "thinking");
     sv.priorKnowledge = p.getString("prior_knowledge");
     sv.confidence = p.getString("confidence");
@@ -859,6 +919,7 @@ void stopRecordingAndSend() {
 }
 
 void speak(String text) {
+  if (offlineMode) return;
   ttsQueue.offer(text);
 }
 
@@ -922,11 +983,79 @@ void sendTurn() {
       }
       status = "응답 도착 · " + res.getString("mode") + " · " + currentPhase().name;
     } catch (Exception e) {
-      status = "연결 실패: " + e.getMessage();
+      offlineMode = true;
+      cachedTurn(utterance);
+      status = "오프라인 캐시 응답 · 서버 연결 없음";
     } finally {
       sending = false;
     }
   }).start();
+}
+
+void cachedTurn(String utterance) {
+  offlineTurnCount += 1;
+  String[][] lines = {
+    {"harin", "국어사전 뜻이 아니라, 그 물건과 함께한 경험이 중요하다고 생각해요.", "confident", "0.04"},
+    {"junseo", "저는 비싼 물건이 더 의미 있다고 생각했어요.", "thinking", "-0.02"},
+    {"minji", "친구랑 순서가 같아야 친구인가요?", "confused", "0.01"},
+  };
+  int count = utterance.length() < 12 ? 1 : 2;
+  for (int k = 0; k < count; k++) {
+    String[] row = lines[(offlineTurnCount + k) % lines.length];
+    transcript.add(row[1] == null ? row[0] : findStudentName(row[0]) + ": " + row[1]);
+    for (StudentView sv : students) {
+      if (sv.id.equals(row[0])) {
+        sv.state = row[2];
+        sv.mastery = constrain(sv.mastery + Float.parseFloat(row[3]), 0.01, 0.99);
+        try {
+          sv.initialMastery.setFloat(firstKey(sv.initialMastery), sv.mastery);
+        } catch (Exception ignored) {}
+      }
+    }
+  }
+}
+
+String findStudentName(String id) {
+  for (StudentView sv : students) {
+    if (sv.id.equals(id)) return sv.name;
+  }
+  return id;
+}
+
+String firstKey(JSONObject obj) {
+  for (Object key : obj.keys()) return (String) key;
+  return "kc1";
+}
+
+void buildOfflineReplay() {
+  replayEntries.clear();
+  replaySummary.clear();
+  replayKt.clear();
+  replaySummary.add("오프라인 모드 · " + formatClock(elapsedSec())
+      + " · 서버 리포트 없이 로컬 대화록만 표시합니다.");
+  for (PhaseView p : phases) {
+    replaySummary.add(p.name + "  계획 " + p.minutes + "분 · 실제 기록 없음");
+  }
+  StringBuilder kt = new StringBuilder();
+  for (StudentView sv : students) {
+    if (kt.length() > 0) kt.append(" · ");
+    kt.append(sv.name).append(" ").append(nf(sv.mastery, 1, 2));
+  }
+  replayKt.add("[현재] " + kt.toString());
+  for (int i = 0; i < transcript.size(); i++) {
+    String line = transcript.get(i);
+    if (line.startsWith("T: ")) {
+      replayEntries.add(new ReplayEntry(i * 5, "교사", line.substring(3), true));
+    } else if (line.contains(": ")) {
+      int cut = line.indexOf(": ");
+      replayEntries.add(new ReplayEntry(i * 5, line.substring(0, cut), line.substring(cut + 2), false));
+    } else {
+      replayEntries.add(new ReplayEntry(i * 5, "시스템", line, false));
+    }
+  }
+  replayScroll = 0;
+  replayMode = true;
+  feedbackMode = false;
 }
 
 String postJson(String url, String body) throws Exception {

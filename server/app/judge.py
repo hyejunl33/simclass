@@ -373,7 +373,7 @@ def _call_ollama(messages: list[dict[str, str]], timeout: float = 90.0) -> dict[
         "messages": messages,
         "stream": False,
         "format": "json",
-        "options": {"temperature": 0.2, "num_predict": 1400},
+        "options": {"temperature": 0.2, "num_predict": 3000},
     }
     with httpx.Client(timeout=timeout) as client:
         res = client.post(url, json=payload)
@@ -538,7 +538,18 @@ def _llm_report(
     domains: list[DomainScore] = []
     rejected: list[str] = []
     for attempt in range(2):
-        payload = _call_ollama(_stage2_prompt(lesson, transcript, coded, errors or None))
+        try:
+            payload = _call_ollama(
+                _stage2_prompt(lesson, transcript, coded, errors or None),
+                timeout=180.0,
+            )
+        except Exception as exc:
+            errors = [
+                "Return valid, complete JSON only. The previous output could not be parsed: "
+                + str(exc)[:120]
+            ]
+            validated["retries"] = attempt
+            continue
         domains, errors, rejected = _validate_llm_domains(payload, transcript)
         validated["retries"] = attempt
         if not errors:
