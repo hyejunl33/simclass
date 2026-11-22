@@ -68,6 +68,19 @@ responses so the UI loop can be tested without a model. Use the "HWP 수업안
 server returns a `LessonSpec`; the UI shows the topic, phase count, duration, and
 whether review is needed.
 
+## 40-minute session + replay
+
+`POST /api/session/start` creates a timed session from the lesson phases
+(5/17/12/6 minutes). `POST /api/turn` records teacher and student turns plus a KT
+snapshot. `POST /api/session/{id}/advance` and `/end` move through the lesson,
+and `GET /api/session/{id}/replay` returns the transcript, KT timeline, and
+planned-vs-actual phase timings.
+
+In the Processing app, use **수업 시작 → 발문/음성 입력 → 다음 단계 → 수업 종료 →
+리플레이**. After a session ends, **새 세션** runs the same lesson and personas
+again for the practice-effect comparison. See
+[`docs/session_flow.md`](docs/session_flow.md).
+
 ## Local LLM (Ollama)
 
 The server uses a prompt-only small model; no fine-tuning.
@@ -98,13 +111,13 @@ See [docs/mac_mini_setup.md](docs/mac_mini_setup.md) and
 - [`docs/rubric.md`](docs/rubric.md) — lesson-demonstration rubric and evidence rules
 - [`docs/ws_protocol.md`](docs/ws_protocol.md) — message contract
 - [`docs/mac_mini_setup.md`](docs/mac_mini_setup.md) — Mac mini runtime + laptop connection
+- [`docs/session_flow.md`](docs/session_flow.md) — 40-minute phases, session API, replay
 - [`fixtures/lesson_plans/objects_meaning.json`](fixtures/lesson_plans/objects_meaning.json) — 즐생 lesson fixture
 - [`fixtures/personas/objects_meaning.json`](fixtures/personas/objects_meaning.json) — three persona fixture
 
 ## Status
 
-Tickets 01–05 are implemented: end-to-end mock loop, HWP ingest, persona
-generation/editing, local Ollama adapter with fallback, and BKT mastery.
-The ASR/TTS adapters and Processing hold-to-talk/TTS hooks are implemented.
-End-to-end verification now needs the Mac mini runtime; see
-`docs/mac_mini_setup.md`.
+Tickets 01–08 are implemented and verified on the Mac mini: end-to-end loop,
+HWP ingest, persona generation/editing, Ollama fallback, BKT mastery, real-time
+voice (MLX Whisper), macOS TTS, and the 40-minute phase flow + replay. The next
+slices are the rubric judge (ticket 09) and demo hardening (ticket 10).
