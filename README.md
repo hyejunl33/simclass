@@ -93,6 +93,7 @@ answer.
 
 ## Status
 
-Scaffold + lesson ingest + persona generation/editing are implemented. See
-GitHub issues for the ticket graph; the next slice is the real local LLM turn
-loop (issue #5).
+Tickets 01–05 are implemented: end-to-end mock loop, HWP ingest, persona
+generation/editing, local Ollama adapter with fallback, and BKT mastery.
+Next slices are real-time voice (issue #7) and TTS (issue #8); both need the
+Mac mini Whisper/`say` runtime for end-to-end verification.
