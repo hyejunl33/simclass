@@ -313,7 +313,9 @@ def _dialogue(transcript: list[TranscriptEntry]) -> str:
 
 def _call_ollama(messages: list[dict[str, str]], timeout: float = 90.0) -> dict[str, Any]:
     url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
-    model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b-instruct-q4_K_M")
+    model = os.getenv("JUDGE_MODEL") or os.getenv(
+        "OLLAMA_MODEL", "qwen2.5:3b-instruct-q4_K_M"
+    )
     payload = {
         "model": model,
         "messages": messages,
@@ -429,6 +431,8 @@ def _validate_llm_domains(
                 continue
             quote = str(item.get("quote", "")).strip()
             turn_id = item.get("turn_id")
+            if isinstance(turn_id, str) and turn_id.strip().isdigit():
+                turn_id = int(turn_id.strip())
             if not isinstance(turn_id, int):
                 rejected.append(quote)
                 errors.append(f"{domain_id}: turn_id must be an integer")
