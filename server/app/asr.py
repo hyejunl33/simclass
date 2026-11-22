@@ -26,13 +26,27 @@ def transcribe_bytes(data: bytes) -> tuple[str, str]:
         return str(body.get("text", "")).strip(), "http"
     if mode in {"mlx", "mlx_whisper"}:
         import mlx_whisper  # type: ignore
+        import numpy as np
+        from scipy.io import wavfile
 
         model = os.getenv("WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as fp:
             fp.write(data)
             path = Path(fp.name)
         try:
-            result = mlx_whisper.transcribe(str(path), path_or_hf_repo=model, language="ko")
+            sr, audio = wavfile.read(str(path))
+            if audio.ndim > 1:
+                audio = audio.mean(axis=1)
+            if audio.dtype.kind == "i":
+                audio = audio.astype(np.float32) / 32768.0
+            else:
+                audio = audio.astype(np.float32)
+            result = mlx_whisper.transcribe(
+                audio,
+                path_or_hf_repo=model,
+                language="ko",
+                condition_on_previous_text=False,
+            )
             return str(result.get("text", "")).strip(), "mlx_whisper"
         finally:
             path.unlink(missing_ok=True)
