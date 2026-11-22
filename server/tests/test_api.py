@@ -198,3 +198,67 @@ def test_asr_mock_returns_text():
 def test_tts_mock_returns_no_content():
     r = client.post("/api/tts", json={"text": "국어사전에 나오는 뜻이요?"})
     assert r.status_code == 204
+
+
+def test_session_flow_advance_end_replay():
+    sid = "session-flow-test"
+    start = client.post(
+        "/api/session/start",
+        json={"lesson_id": "objects-meaning", "session_id": sid},
+    )
+    assert start.status_code == 200, start.text
+    body = start.json()
+    assert body["phase_id"] == "intro"
+    assert body["total_planned_sec"] == 2400
+
+    first = client.post(
+        "/api/turn",
+        json={
+            "session_id": sid,
+            "lesson_id": "objects-meaning",
+            "phase_id": "intro",
+            "teacher_utterance": "지난 시간에 무엇을 배웠나요?",
+        },
+    )
+    assert first.status_code == 200, first.text
+    assert 1 <= len(first.json()["students"]) <= 2
+
+    advanced = client.post(f"/api/session/{sid}/advance")
+    assert advanced.status_code == 200, advanced.text
+    assert advanced.json()["phase_id"] == "concept"
+
+    second = client.post(
+        "/api/turn",
+        json={
+            "session_id": sid,
+            "lesson_id": "objects-meaning",
+            "phase_id": "concept",
+            "teacher_utterance": "물건의 의미는 무엇일까요?",
+        },
+    )
+    assert second.status_code == 200, second.text
+
+    ended = client.post(f"/api/session/{sid}/end")
+    assert ended.status_code == 200, ended.text
+    assert ended.json()["completed"] is True
+    assert ended.json()["turns"] == 2
+
+    replay = client.get(f"/api/session/{sid}/replay")
+    assert replay.status_code == 200, replay.text
+    data = replay.json()
+    assert data["completed"] is True
+    assert len(data["phases"]) == 4
+    assert data["phases"][0]["planned_min"] == 5
+    assert sum(t["entries"] for t in data["phases"]) == len(data["transcript"])
+    speakers = {e["speaker"] for e in data["transcript"]}
+    assert speakers == {"teacher", "student"}
+    assert len(data["kt_timeline"]) == 2
+    assert set(data["final_kt"]) == {"harin", "junseo", "minji"}
+
+    again = client.post(f"/api/session/{sid}/advance")
+    assert again.status_code == 409
+
+
+def test_unknown_session_is_404():
+    assert client.get("/api/session/nope/replay").status_code == 404
+    assert client.post("/api/session/nope/end").status_code == 404

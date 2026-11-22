@@ -20,26 +20,43 @@ import java.io.InputStream;
 import processing.data.JSONArray;
 import processing.data.JSONObject;
 
-// SimClass — Processing client (MVP + HWP ingest)
-// Sends a teacher utterance to FastAPI and renders mock student responses.
+// SimClass — Processing client
+// 40-minute lesson rehearsal: HWP lesson plan, 3 personas, voice turns, BKT bars,
+// phase timer, session end, and transcript + KT replay.
 
 String SERVER_BASE = "http://127.0.0.1:8010";
-final String LESSON_ID = "objects-meaning";
-final String PHASE_ID = "concept";
-
-String input = "";
-String status = "발문을 입력하고 Enter를 누르세요.";
+String lessonId = "objects-meaning";
 String lessonTopic = "물건의 의미는 무엇일까요?";
 String lessonSummary = "HWP를 불러오면 수업안 요약이 표시됩니다.";
-String lessonId = "objects-meaning";
+
+String input = "";
+String status = "HWP를 불러오거나 [수업 시작]을 누르세요.";
 ArrayList<String> misconceptionOptions = new ArrayList<String>();
+ArrayList<String> misconceptionIds = new ArrayList<String>();
 LinkedBlockingQueue<String> ttsQueue = new LinkedBlockingQueue<String>();
 boolean sending = false;
 boolean recording = false;
+boolean advancing = false;
+boolean lastAdvanceFailed = false;
+long lastAdvanceAttemptMs = 0;
 VoiceRecorder recorder;
 
 ArrayList<StudentView> students = new ArrayList<StudentView>();
 ArrayList<String> transcript = new ArrayList<String>();
+ArrayList<PhaseView> phases = new ArrayList<PhaseView>();
+
+String sessionId = "";
+boolean sessionStarted = false;
+boolean sessionEnded = false;
+long sessionStartMs = 0;
+long phaseAnchorMs = 0;
+int phaseIndex = 0;
+
+boolean replayMode = false;
+ArrayList<ReplayEntry> replayEntries = new ArrayList<ReplayEntry>();
+ArrayList<String> replaySummary = new ArrayList<String>();
+ArrayList<String> replayKt = new ArrayList<String>();
+int replayScroll = 0;
 
 void setup() {
   size(1100, 720);
@@ -48,9 +65,11 @@ void setup() {
   if (cfg != null && cfg.length > 0 && cfg[0].trim().length() > 0) {
     SERVER_BASE = cfg[0].trim();
   }
-  students.add(new StudentView("harin", "하린", "국어사전 뜻", "confused", 0.55));
-  students.add(new StudentView("junseo", "준서", "비싼 것", "thinking", 0.35));
-  students.add(new StudentView("minji", "민지", "같은 순서 친구", "confused", 0.20));
+
+  defaultPhases();
+  students.add(new StudentView("harin", "하린", "", "국어사전 뜻", "confused"));
+  students.add(new StudentView("junseo", "준서", "", "비싼 것", "thinking"));
+  students.add(new StudentView("minji", "민지", "", "같은 순서 친구", "confused"));
 
   new Thread(() -> {
     while (true) {
@@ -60,41 +79,116 @@ void setup() {
       }
     }
   }).start();
+
+  refreshLessonAsync();
+}
+
+void defaultPhases() {
+  phases.clear();
+  phases.add(new PhaseView("intro", "학습 문제 확인", 5));
+  phases.add(new PhaseView("concept", "개념 형성", 17));
+  phases.add(new PhaseView("interpretation", "자료 해석", 12));
+  phases.add(new PhaseView("application", "원리 적용", 6));
+}
+
+float elapsedSec() {
+  if (!sessionStarted) return 0;
+  return (millis() - sessionStartMs) / 1000.0;
+}
+
+float phaseElapsedSec() {
+  if (!sessionStarted) return 0;
+  return (millis() - phaseAnchorMs) / 1000.0;
+}
+
+int totalPlannedSec() {
+  int total = 0;
+  for (PhaseView p : phases) total += p.minutes * 60;
+  return total == 0 ? 2400 : total;
+}
+
+PhaseView currentPhase() {
+  if (phases.size() == 0) return new PhaseView("", "수업", 40);
+  return phases.get(constrain(phaseIndex, 0, phases.size() - 1));
 }
 
 void draw() {
   background(247, 248, 250);
+  autoAdvance();
 
   // Header
   fill(30, 35, 45);
-  textSize(26);
+  textSize(24);
   text("SimClass · 즐생 수업 리허설", 36, 48);
-  textSize(15);
+
+  drawButton(560, 22, 150, 42, startButtonLabel(), isSessionRunning());
+  drawButton(720, 22, 150, 42, recording ? "녹음 중... 놓으세요" : "음성 입력 (hold)",
+      isSessionRunning(), recording ? color(210, 40, 40) : color(245, 247, 250),
+      recording ? color(255) : color(40, 45, 55));
+  drawButton(880, 22, 184, 42, "HWP 수업안 불러오기", true);
+
+  // Lesson / phase line
   fill(70, 78, 90);
-  text(lessonTopic, 36, 74, 820, 24);
-  textSize(12);
+  textSize(15);
+  text(lessonTopic, 36, 78, 570, 22);
+  fill(90, 98, 110);
+  textSize(13);
+  PhaseView phase = currentPhase();
+  text("Phase " + (phaseIndex + 1) + "/" + phases.size() + " · " + phase.name, 610, 78, 300, 20);
+
+  fill(sessionEnded ? color(60, 140, 100) : color(50, 90, 180));
+  textSize(13);
+  String timer = formatClock(elapsedSec()) + " / " + formatClock(totalPlannedSec());
+  text(timer, 890, 78, 174, 20);
+
+  // Overall progress bar
+  fill(228, 232, 238);
+  rect(36, 96, 1028, 6, 3);
+  float progress = constrain(elapsedSec() / (float) totalPlannedSec(), 0, 1);
+  fill(sessionEnded ? color(60, 140, 100) : color(80, 130, 220));
+  rect(36, 96, 1028 * progress, 6, 3);
+
+  drawStudents();
+  if (replayMode) {
+    drawReplay();
+  } else {
+    drawConversation();
+  }
+  drawInput();
+
   fill(120, 128, 140);
-  text(lessonSummary + "  ·  Phase: 개념 형성", 36, 96, 820, 20);
+  textSize(12);
+  text(status, 36, 704);
+}
 
-  // HWP upload button
-  fill(245, 247, 250);
+String startButtonLabel() {
+  if (sessionEnded) return "새 세션";
+  if (sessionStarted) return "수업 중";
+  return "수업 시작";
+}
+
+boolean isSessionRunning() {
+  return sessionStarted && !sessionEnded && !replayMode;
+}
+
+void drawButton(float x, float y, float w, float h, String label, boolean enabled) {
+  drawButton(x, y, w, h, label, enabled, color(245, 247, 250), color(45, 55, 70));
+}
+
+void drawButton(
+    float x, float y, float w, float h, String label, boolean enabled,
+    color bg, color fg) {
+  fill(enabled ? bg : color(238, 240, 244));
   stroke(200, 205, 215);
-  rect(884, 22, 180, 42, 10);
+  strokeWeight(1);
+  rect(x, y, w, h, 10);
   noStroke();
-  fill(50, 90, 180);
+  fill(enabled ? fg : color(160, 166, 176));
   textSize(14);
-  text("HWP 수업안 불러오기", 898, 48);
+  text(label, x + 14, y + h / 2 + 5);
+}
 
-  // Voice push-to-talk button
-  fill(recording ? color(210, 40, 40) : color(245, 247, 250));
-  stroke(200, 205, 215);
-  rect(690, 22, 180, 42, 10);
-  noStroke();
-  fill(recording ? color(255) : color(40, 45, 55));
-  textSize(14);
-  text(recording ? "녹음 중... 놓으세요" : "음성 입력 (hold)", 706, 48);
-
-  // Student cards
+void drawStudents() {
   for (int i = 0; i < students.size(); i++) {
     StudentView s = students.get(i);
     float x = 36 + i * 350;
@@ -118,55 +212,119 @@ void draw() {
 
     fill(90, 98, 110);
     textSize(13);
-    text("오개념: " + s.misconception, x + 20, y + 80);
-    text("mastery: " + nf((float)s.mastery, 1, 2), x + 20, y + 102);
+    text("오개념: " + shorten(s.misconception, 24), x + 20, y + 80);
+    text("mastery: " + nf(s.mastery, 1, 2), x + 20, y + 102);
 
     fill(232, 235, 240);
     rect(x + 20, y + 114, w - 40, 8, 4);
     fill(80, 130, 220);
-    rect(x + 20, y + 114, (w - 40) * (float)s.mastery, 8, 4);
+    rect(x + 20, y + 114, (w - 40) * constrain(s.mastery, 0, 1), 8, 4);
   }
+}
 
-  // Transcript
+void drawConversation() {
   fill(255);
   stroke(225, 228, 234);
   rect(36, 280, 1028, 330, 14);
   noStroke();
   fill(30, 35, 45);
   textSize(18);
-  text("수업 대화", 56, 312);
+  text("수업 대화", 56, 314);
+
+  drawButton(738, 288, 92, 30, "다음 단계", isSessionRunning());
+  drawButton(838, 288, 92, 30, "수업 종료", isSessionRunning());
+  drawButton(938, 288, 108, 30, "리플레이", sessionStarted);
+
   textSize(14);
   fill(70, 78, 90);
-  float ty = 342;
-  int start = max(0, transcript.size() - 12);
+  float ty = 350;
+  int start = max(0, transcript.size() - 11);
   for (int i = start; i < transcript.size(); i++) {
     text(transcript.get(i), 56, ty, 980, 40);
     ty += 22;
   }
+}
 
-  // Input
+void drawReplay() {
   fill(255);
+  stroke(225, 228, 234);
+  rect(36, 280, 1028, 400, 14);
+  noStroke();
+  fill(30, 35, 45);
+  textSize(18);
+  text("리플레이 · 수업 대화 + KT 타임라인", 56, 314);
+
+  drawButton(938, 288, 108, 30, "대화로", true);
+
+  textSize(13);
+  fill(70, 78, 90);
+  float y = 344;
+  for (int i = 0; i < replaySummary.size(); i++) {
+    text(replaySummary.get(i), 56, y, 980, 20);
+    y += 20;
+  }
+
+  y += 10;
+  fill(50, 90, 180);
+  textSize(13);
+  text("KT 타임라인 (학생별 평균 mastery)", 56, y);
+  y += 18;
+  fill(70, 78, 90);
+  for (int i = 0; i < replayKt.size(); i++) {
+    text(replayKt.get(i), 56, y, 980, 18);
+    y += 18;
+  }
+
+  y += 8;
+  fill(30, 35, 45);
+  textSize(13);
+  text("대화", 56, y);
+  y += 20;
+
+  int visible = 7;
+  replayScroll = constrain(replayScroll, 0, max(0, replayEntries.size() - visible));
+  for (int i = replayScroll; i < min(replayEntries.size(), replayScroll + visible); i++) {
+    ReplayEntry e = replayEntries.get(i);
+    fill(e.teacher ? color(40, 60, 95) : color(70, 78, 90));
+    text("[" + formatClock(e.t) + "] " + e.label + ": " + e.text, 56, y, 980, 18);
+    y += 18;
+  }
+}
+
+void drawInput() {
+  if (replayMode) return;
+  boolean active = isSessionRunning();
+  fill(active ? color(255) : color(243, 245, 248));
   stroke(200, 205, 215);
   rect(36, 632, 860, 48, 10);
   noStroke();
-  fill(30, 35, 45);
+  fill(active ? color(30, 35, 45) : color(160, 166, 176));
   textSize(16);
-  text(input + (frameCount / 30 % 2 == 0 ? "|" : ""), 52, 662);
+  if (active) {
+    text(input + (frameCount / 30 % 2 == 0 ? "|" : ""), 52, 662);
+  } else {
+    text(sessionEnded ? "수업이 끝났습니다. [리플레이] 또는 [새 세션]을 선택하세요." : "수업을 시작하면 발문을 입력할 수 있습니다.", 52, 662);
+  }
 
-  // Send button
-  fill(sending ? color(160, 170, 185) : color(50, 90, 180));
-  rect(910, 632, 154, 48, 10);
-  fill(255);
-  textSize(16);
-  text(sending ? "전송 중..." : "발문 전송", 942, 662);
+  drawButton(910, 632, 154, 48,
+      sending ? "전송 중..." : "발문 전송", active && !sending, color(50, 90, 180), color(255));
+}
 
-  // Status
-  fill(120, 128, 140);
-  textSize(12);
-  text(status, 36, 704);
+void autoAdvance() {
+  if (!isSessionRunning() || advancing) return;
+  long now = millis();
+  if (now - lastAdvanceAttemptMs < 2000) return;
+  PhaseView p = currentPhase();
+  if (phaseElapsedSec() < p.minutes * 60) return;
+  if (phaseIndex >= phases.size() - 1) {
+    endSession(true);
+    return;
+  }
+  advancePhase();
 }
 
 void keyTyped() {
+  if (!isSessionRunning()) return;
   if (key == ENTER || key == RETURN) {
     sendTurn();
   } else if (key == BACKSPACE) {
@@ -177,34 +335,262 @@ void keyTyped() {
 }
 
 void mousePressed() {
-  if (mouseX > 690 && mouseX < 870 && mouseY > 22 && mouseY < 64) {
-    startRecording();
+  // Start / new session
+  if (mouseX > 560 && mouseX < 710 && mouseY > 22 && mouseY < 64) {
+    if (!sessionStarted || sessionEnded) startSession();
     return;
   }
-  if (mouseX > 884 && mouseX < 1064 && mouseY > 22 && mouseY < 64) {
+  if (mouseX > 720 && mouseX < 870 && mouseY > 22 && mouseY < 64) {
+    if (isSessionRunning()) startRecording();
+    else status = "수업을 시작한 뒤 음성을 사용할 수 있습니다.";
+    return;
+  }
+  if (mouseX > 880 && mouseX < 1064 && mouseY > 22 && mouseY < 64) {
     selectInput("HWP 수업안 선택", "hwpSelected");
     return;
   }
+
+  // Session controls in the conversation header
+  if (mouseY > 288 && mouseY < 318) {
+    if (mouseX > 738 && mouseX < 830) {
+      if (isSessionRunning()) advancePhase();
+      return;
+    }
+    if (mouseX > 838 && mouseX < 930) {
+      if (isSessionRunning()) endSession(true);
+      return;
+    }
+    if (mouseX > 938 && mouseX < 1046) {
+      if (replayMode) {
+        replayMode = false;
+      } else if (sessionStarted) {
+        endSession(true);
+      } else {
+        status = "수업을 시작한 뒤 리플레이할 수 있습니다.";
+      }
+      return;
+    }
+  }
+
   // Click a student card to cycle its misconception.
   if (mouseY > 116 && mouseY < 258) {
     int idx = floor((mouseX - 36) / 350);
     if (idx >= 0 && idx < students.size() && misconceptionOptions.size() > 0) {
       StudentView s = students.get(idx);
       int current = misconceptionOptions.indexOf(s.misconception);
-      s.misconception = misconceptionOptions.get((current + 1) % misconceptionOptions.size());
+      int next = (current + 1) % misconceptionOptions.size();
+      s.misconception = misconceptionOptions.get(next);
+      if (next < misconceptionIds.size()) s.misconceptionId = misconceptionIds.get(next);
       savePersonas();
       status = s.name + "의 오개념을 바꿨습니다.";
       return;
     }
   }
+
   if (mouseX > 910 && mouseX < 1064 && mouseY > 632 && mouseY < 680) {
-    sendTurn();
+    if (isSessionRunning() && !sending) sendTurn();
   }
 }
 
 void mouseReleased() {
   if (recording && mouseButton == LEFT) {
     stopRecordingAndSend();
+  }
+}
+
+void mouseWheel(processing.event.MouseEvent event) {
+  if (!replayMode) return;
+  replayScroll += event.getCount() * 3;
+  replayScroll = constrain(replayScroll, 0, max(0, replayEntries.size() - 7));
+}
+
+void startSession() {
+  replayMode = false;
+  transcript.clear();
+  replayEntries.clear();
+  replaySummary.clear();
+  replayKt.clear();
+  sessionId = "demo-" + System.currentTimeMillis();
+  phaseIndex = 0;
+  sessionEnded = false;
+  input = "";
+  status = "세션을 시작하는 중...";
+
+  new Thread(() -> {
+    try {
+      JSONObject payload = new JSONObject();
+      payload.setString("lesson_id", lessonId);
+      payload.setString("session_id", sessionId);
+      JSONObject res = parseJSONObject(postJson(SERVER_BASE + "/api/session/start", payload.toString()));
+      phaseIndex = res.getInt("phase_index");
+      sessionStartMs = millis();
+      phaseAnchorMs = sessionStartMs;
+      sessionStarted = true;
+      status = "수업 시작 · " + res.getString("phase_name") + " (" + res.getInt("phase_planned_min") + "분)";
+      transcript.add("[수업 시작] " + lessonTopic);
+    } catch (Exception e) {
+      status = "세션 시작 실패: " + e.getMessage();
+    }
+  }).start();
+}
+
+void advancePhase() {
+  if (!sessionStarted || sessionEnded || advancing) return;
+  advancing = true;
+  lastAdvanceAttemptMs = millis();
+  status = "다음 단계로 이동하는 중...";
+
+  new Thread(() -> {
+    try {
+      JSONObject res = parseJSONObject(
+          postJson(SERVER_BASE + "/api/session/" + sessionId + "/advance", "{}"));
+      int nextIndex = res.getInt("phase_index");
+      phaseIndex = nextIndex;
+      phaseAnchorMs = millis();
+      lastAdvanceFailed = false;
+      status = "단계 이동 · " + res.getString("phase_name") + " (" + res.getInt("phase_remaining_sec") + "초 남음)";
+      transcript.add("[단계] " + res.getString("phase_name"));
+    } catch (Exception e) {
+      lastAdvanceFailed = true;
+      status = "단계 이동 실패: " + e.getMessage();
+    } finally {
+      advancing = false;
+    }
+  }).start();
+}
+
+void endSession(boolean loadReplayAfter) {
+  if (!sessionStarted || sessionEnded || advancing) return;
+  advancing = true;
+  status = "수업을 정리하는 중...";
+
+  new Thread(() -> {
+    try {
+      JSONObject summary = parseJSONObject(
+          postJson(SERVER_BASE + "/api/session/" + sessionId + "/end", "{}"));
+      sessionEnded = true;
+      status = "수업 종료 · " + formatClock(summary.getFloat("elapsed_sec"))
+          + " · 발문 " + summary.getInt("turns") + "회";
+      if (loadReplayAfter) loadReplay();
+    } catch (Exception e) {
+      status = "수업 종료 실패: " + e.getMessage();
+    } finally {
+      advancing = false;
+    }
+  }).start();
+}
+
+void loadReplay() {
+  try {
+    JSONObject rep = parseJSONObject(
+        getJson(SERVER_BASE + "/api/session/" + sessionId + "/replay"));
+    replayEntries.clear();
+    replaySummary.clear();
+    replayKt.clear();
+
+    float duration = rep.getFloat("duration_sec");
+    float planned = rep.getFloat("planned_sec");
+    JSONArray tr = rep.getJSONArray("transcript");
+    int teacherTurns = 0;
+    int studentTurns = 0;
+    for (int i = 0; i < tr.size(); i++) {
+      JSONObject e = tr.getJSONObject(i);
+      boolean isTeacher = "teacher".equals(e.getString("speaker"));
+      if (isTeacher) teacherTurns++;
+      else studentTurns++;
+      String label = e.getString("name");
+      if (label == null || label.length() == 0) label = isTeacher ? "교사" : "학생";
+      replayEntries.add(new ReplayEntry(e.getFloat("t"), label, e.getString("text"), isTeacher));
+    }
+    replaySummary.add("총 " + formatClock(duration) + " / 계획 " + formatClock(planned)
+        + " · 발문 " + teacherTurns + "회 · 학생 응답 " + studentTurns + "회");
+
+    JSONArray ph = rep.getJSONArray("phases");
+    for (int i = 0; i < ph.size(); i++) {
+      JSONObject p = ph.getJSONObject(i);
+      replaySummary.add(p.getString("name") + "  계획 " + p.getInt("planned_min") + "분 · 실제 "
+          + formatClock(p.getFloat("actual_sec")) + " · 발화 " + p.getInt("entries") + "개");
+    }
+
+    JSONArray kt = rep.getJSONArray("kt_timeline");
+    int from = max(0, kt.size() - 3);
+    for (int i = from; i < kt.size(); i++) {
+      JSONObject snap = kt.getJSONObject(i);
+      JSONObject ktm = snap.getJSONObject("kt");
+      replayKt.add("[" + formatClock(snap.getFloat("t")) + "] " + ktLine(ktm));
+    }
+    if (kt.size() == 0) replayKt.add("기록된 KT 변화가 없습니다.");
+
+    replayScroll = 0;
+    replayMode = true;
+  } catch (Exception e) {
+    status = "리플레이 불러오기 실패: " + e.getMessage();
+  }
+}
+
+String ktLine(JSONObject ktMap) {
+  StringBuilder sb = new StringBuilder();
+  for (StudentView s : students) {
+    try {
+      JSONObject m = ktMap.getJSONObject(s.id);
+      if (m != null) {
+        if (sb.length() > 0) sb.append(" · ");
+        sb.append(s.name).append(" ").append(nf(avgMastery(m), 1, 2));
+      }
+    } catch (Exception ignored) {}
+  }
+  return sb.toString();
+}
+
+void refreshLessonAsync() {
+  new Thread(() -> {
+    try {
+      JSONObject lesson = parseJSONObject(getJson(SERVER_BASE + "/api/lesson/" + lessonId));
+      applyLesson(lesson);
+      JSONObject ps = parseJSONObject(getJson(SERVER_BASE + "/api/personas/" + lessonId));
+      applyPersonas(ps.getJSONArray("personas"));
+      status = "서버 연결됨 · 수업을 시작할 수 있습니다.";
+    } catch (Exception e) {
+      status = "서버 대기 중 · " + e.getMessage();
+    }
+  }).start();
+}
+
+void applyLesson(JSONObject lesson) {
+  lessonId = lesson.getString("id");
+  lessonTopic = lesson.getString("topic");
+  JSONArray arr = lesson.getJSONArray("phases");
+  int minutes = lesson.getInt("duration_min");
+  lessonSummary = arr.size() + "단계 · " + minutes + "분 · 학생 3명";
+  phases.clear();
+  for (int i = 0; i < arr.size(); i++) {
+    JSONObject p = arr.getJSONObject(i);
+    phases.add(new PhaseView(p.getString("id"), p.getString("name"), p.getInt("minutes")));
+  }
+  if (phases.size() == 0) defaultPhases();
+}
+
+void applyPersonas(JSONArray ps) {
+  students.clear();
+  for (int i = 0; i < ps.size(); i++) {
+    JSONObject p = ps.getJSONObject(i);
+    StudentView sv = new StudentView(
+        p.getString("id"),
+        p.getString("name"),
+        p.getString("misconception_id"),
+        p.getString("misconception"),
+        "thinking");
+    sv.priorKnowledge = p.getString("prior_knowledge");
+    sv.confidence = p.getString("confidence");
+    sv.speechStyle = p.getString("speech_style");
+    try {
+      sv.initialMastery = p.getJSONObject("initial_mastery");
+      if (sv.initialMastery == null) sv.initialMastery = new JSONObject();
+    } catch (Exception ignored) {
+      sv.initialMastery = new JSONObject();
+    }
+    sv.mastery = avgMastery(sv.initialMastery);
+    students.add(sv);
   }
 }
 
@@ -220,44 +606,29 @@ void hwpSelected(File selection) {
       payload.setString("data_base64", encoded);
       String response = postJson(SERVER_BASE + "/api/lesson/ingest", payload.toString());
       JSONObject lesson = parseJSONObject(response);
-      lessonId = lesson.getString("id");
-      lessonTopic = lesson.getString("topic");
-      int phases = lesson.getJSONArray("phases").size();
-      int minutes = lesson.getInt("duration_min");
-      lessonSummary = phases + "단계 · " + minutes + "분 · 학생 3명";
+      applyLesson(lesson);
+
+      sessionStarted = false;
+      sessionEnded = false;
+      replayMode = false;
+      sessionId = "";
+      phaseIndex = 0;
+      transcript.clear();
 
       // Refresh misconception choices and generate personas.
       misconceptionOptions.clear();
+      misconceptionIds.clear();
       JSONArray ms = lesson.getJSONArray("misconceptions");
       for (int i = 0; i < ms.size(); i++) {
-        misconceptionOptions.add(ms.getJSONObject(i).getString("text"));
+        JSONObject m = ms.getJSONObject(i);
+        misconceptionOptions.add(m.getString("text"));
+        misconceptionIds.add(m.getString("id"));
       }
       JSONObject pReq = new JSONObject();
       pReq.setString("lesson_id", lessonId);
       JSONObject pRes = parseJSONObject(
           postJson(SERVER_BASE + "/api/personas/generate", pReq.toString()));
-      JSONArray ps = pRes.getJSONArray("personas");
-      students.clear();
-      for (int i = 0; i < ps.size(); i++) {
-        JSONObject p = ps.getJSONObject(i);
-        StudentView sv = new StudentView(
-            p.getString("id"),
-            p.getString("name"),
-            p.getString("misconception"),
-            "thinking",
-            0.5);
-        sv.priorKnowledge = p.getString("prior_knowledge");
-        sv.confidence = p.getString("confidence");
-        sv.speechStyle = p.getString("speech_style");
-        try {
-          JSONObject m = p.getJSONObject("initial_mastery");
-          for (Object key : m.keys()) {
-            sv.mastery = m.getFloat((String) key);
-            break;
-          }
-        } catch (Exception ignored) {}
-        students.add(sv);
-      }
+      applyPersonas(pRes.getJSONArray("personas"));
 
       status = "수업안 파싱 완료" + (lesson.getBoolean("needs_review") ? " · 검토 필요" : "");
       transcript.add("[수업안] " + lessonTopic);
@@ -279,13 +650,11 @@ void savePersonas() {
       p.setString("id", s.id);
       p.setString("name", s.name);
       p.setString("prior_knowledge", s.priorKnowledge);
-      p.setString("misconception_id", "");
+      p.setString("misconception_id", s.misconceptionId);
       p.setString("misconception", s.misconception);
       p.setString("confidence", s.confidence);
       p.setString("speech_style", s.speechStyle);
-      JSONObject m = new JSONObject();
-      m.setFloat("kc1", s.mastery);
-      p.setJSONObject("initial_mastery", m);
+      p.setJSONObject("initial_mastery", s.initialMastery);
       arr.append(p);
     }
     payload.setJSONArray("personas", arr);
@@ -361,12 +730,13 @@ void sendTurn() {
   status = "서버에 발문을 보내는 중...";
   transcript.add("T: " + utterance);
 
+  String phaseId = currentPhase().id;
   new Thread(() -> {
     try {
       JSONObject payload = new JSONObject();
-      payload.setString("session_id", "demo-1");
-      payload.setString("lesson_id", LESSON_ID);
-      payload.setString("phase_id", PHASE_ID);
+      payload.setString("session_id", sessionId);
+      payload.setString("lesson_id", lessonId);
+      payload.setString("phase_id", phaseId);
       payload.setString("teacher_utterance", utterance);
       String response = postJson(SERVER_BASE + "/api/turn", payload.toString());
       JSONObject res = parseJSONObject(response);
@@ -383,15 +753,15 @@ void sendTurn() {
             sv.state = state;
             try {
               JSONObject m = s.getJSONObject("mastery");
-              for (Object key : m.keys()) {
-                sv.mastery = m.getFloat((String) key);
-                break;
+              if (m != null) {
+                sv.initialMastery = m;
+                sv.mastery = avgMastery(m);
               }
             } catch (Exception ignored) {}
           }
         }
       }
-      status = "응답 도착 · mock 모드";
+      status = "응답 도착 · " + res.getString("mode") + " · " + currentPhase().name;
     } catch (Exception e) {
       status = "연결 실패: " + e.getMessage();
     } finally {
@@ -404,14 +774,20 @@ String postJson(String url, String body) throws Exception {
   return requestJson("POST", url, body);
 }
 
+String getJson(String url) throws Exception {
+  return requestJson("GET", url, null);
+}
+
 String requestJson(String method, String url, String body) throws Exception {
   HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
   conn.setRequestMethod(method);
   conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-  conn.setDoOutput(true);
-  byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-  try (OutputStream os = conn.getOutputStream()) {
-    os.write(bytes);
+  if (body != null) {
+    conn.setDoOutput(true);
+    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+    try (OutputStream os = conn.getOutputStream()) {
+      os.write(bytes);
+    }
   }
   int code = conn.getResponseCode();
   if (code != 200) {
@@ -446,10 +822,60 @@ byte[] requestBytes(String url, String body) throws Exception {
   return out.toByteArray();
 }
 
+float avgMastery(JSONObject m) {
+  if (m == null) return 0;
+  float sum = 0;
+  int n = 0;
+  for (Object key : m.keys()) {
+    sum += m.getFloat((String) key);
+    n++;
+  }
+  return n == 0 ? 0 : sum / n;
+}
+
+String shorten(String s, int maxLen) {
+  if (s == null) return "";
+  return s.length() <= maxLen ? s : s.substring(0, maxLen - 1) + "…";
+}
+
+String formatClock(float seconds) {
+  int total = max(0, round(seconds));
+  int m = total / 60;
+  int s = total % 60;
+  return nf(m, 2) + ":" + nf(s, 2);
+}
+
 color stateColor(String state) {
+  if (state == null) return color(60, 140, 100);
   if (state.equals("confused")) return color(200, 90, 80);
   if (state.equals("thinking")) return color(190, 140, 40);
   return color(60, 140, 100);
+}
+
+class PhaseView {
+  String id;
+  String name;
+  int minutes;
+
+  PhaseView(String id, String name, int minutes) {
+    this.id = id;
+    this.name = name;
+    this.minutes = minutes;
+  }
+}
+
+class ReplayEntry {
+  float t;
+  String label;
+  String text;
+  boolean teacher;
+
+  ReplayEntry(float t, String label, String text, boolean teacher) {
+    this.t = t;
+    this.label = label;
+    this.text = text;
+    this.teacher = teacher;
+  }
 }
 
 class VoiceRecorder {
@@ -494,18 +920,20 @@ class VoiceRecorder {
 class StudentView {
   String id;
   String name;
+  String misconceptionId;
   String misconception;
   String state;
   float mastery;
+  JSONObject initialMastery = new JSONObject();
   String priorKnowledge = "중간";
   String confidence = "중간";
   String speechStyle = "";
 
-  StudentView(String id, String name, String misconception, String state, float mastery) {
+  StudentView(String id, String name, String misconceptionId, String misconception, String state) {
     this.id = id;
     this.name = name;
+    this.misconceptionId = misconceptionId;
     this.misconception = misconception;
     this.state = state;
-    this.mastery = mastery;
   }
 }
