@@ -966,7 +966,7 @@ String requestJson(String method, String url, String body) throws Exception {
   try (BufferedReader br = new BufferedReader(
       new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
     String line;
-    while ((line = br.readLine()) != null) sb.append(line);
+    while ((line = br.readLine()) != null) sb.append(line).append('\n');
   }
   return sb.toString();
 }
