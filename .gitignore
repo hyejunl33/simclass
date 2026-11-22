@@ -1,3 +1,6 @@
+__pycache__/
+*.pyc
+server/.venv/
 reports/*.json
 reports/*.md
 reports/validation/*.json

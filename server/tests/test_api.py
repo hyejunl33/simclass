@@ -534,3 +534,30 @@ def test_sample_session_fixtures_are_served():
     assert md.status_code == 200, md.text
     assert "SimClass 수업실연 피드백" in md.text
     assert "공식 채점표가 아닙니다" in md.text
+
+
+def test_async_judge_job_polls_to_completion(tmp_path, monkeypatch):
+    import time
+
+    import app.judge as judge_mod
+
+    monkeypatch.setattr(judge_mod, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(judge_mod, "VALIDATION_DIR", tmp_path / "validation")
+
+    sid = "judge-async-test"
+    _run_judged_session(sid)
+    started = client.post(f"/api/session/{sid}/judge/start")
+    assert started.status_code == 200, started.text
+    job_id = started.json()["job_id"]
+    assert started.json()["status"] == "running"
+
+    job = None
+    for _ in range(50):
+        job = client.get(f"/api/judge/{job_id}").json()
+        if job["status"] != "running":
+            break
+        time.sleep(0.1)
+    assert job is not None
+    assert job["status"] == "done", job
+    assert job["report"]["session_id"] == sid
+    assert client.get("/api/judge/nope").status_code == 404

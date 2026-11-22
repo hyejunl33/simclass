@@ -671,8 +671,25 @@ void requestJudge() {
 
   new Thread(() -> {
     try {
-      JSONObject rep = parseJSONObject(
-          postJson(SERVER_BASE + "/api/session/" + sessionId + "/judge", "{}"));
+      JSONObject start = parseJSONObject(
+          postJson(SERVER_BASE + "/api/session/" + sessionId + "/judge/start", "{}"));
+      String jobId = start.getString("job_id");
+      JSONObject rep = null;
+      long began = millis();
+      while (millis() - began < 300000) {
+        Thread.sleep(2000);
+        JSONObject job = parseJSONObject(getJson(SERVER_BASE + "/api/judge/" + jobId));
+        String state = job.getString("status");
+        if ("done".equals(state)) {
+          rep = job.getJSONObject("report");
+          break;
+        }
+        if ("error".equals(state)) {
+          throw new RuntimeException(job.getString("error"));
+        }
+        status = "피드백 생성 중... " + ((millis() - began) / 1000) + "초 (7B judge)";
+      }
+      if (rep == null) throw new RuntimeException("judge timeout");
       ArrayList<FeedbackDomain> list = new ArrayList<FeedbackDomain>();
       JSONArray arr = rep.getJSONArray("domains");
       for (int i = 0; i < arr.size(); i++) {

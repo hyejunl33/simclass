@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +60,7 @@ app = FastAPI(title="SimClass", version="0.5.0")
 REVIEWED_LESSONS: dict[str, LessonSpec] = {}
 PERSONA_SETS: dict[str, PersonaSet] = {}
 SESSIONS: dict[str, SessionState] = {}
+JUDGE_JOBS: dict[str, dict[str, Any]] = {}
 
 
 class TurnRequest(BaseModel):
@@ -75,6 +78,14 @@ class StudentResponse(BaseModel):
     text: str
     state: str
     mastery: dict[str, float]
+
+
+class JudgeJob(BaseModel):
+    job_id: str
+    session_id: str
+    status: str
+    error: str = ""
+    report: JudgeReport | None = None
 
 
 class TurnResponse(BaseModel):
@@ -207,6 +218,46 @@ def judge(session_id: str) -> JudgeReport:
     report = judge_session(session)
     save_report(report)
     return report
+
+
+@app.post("/api/session/{session_id}/judge/start", response_model=JudgeJob)
+def start_judge(session_id: str) -> JudgeJob:
+    session = get_session(session_id)
+    if not session.completed:
+        raise HTTPException(status_code=409, detail="End the session before judging")
+    job_id = uuid.uuid4().hex[:12]
+    JUDGE_JOBS[job_id] = {
+        "session_id": session_id,
+        "status": "running",
+        "error": "",
+        "report": None,
+    }
+
+    def work() -> None:
+        try:
+            report = judge_session(session)
+            save_report(report)
+            JUDGE_JOBS[job_id].update(status="done", report=report)
+        except Exception as exc:  # noqa: BLE001 - surfaced to the client
+            JUDGE_JOBS[job_id].update(status="error", error=str(exc)[:500])
+
+    threading.Thread(target=work, daemon=True).start()
+    return JudgeJob(job_id=job_id, session_id=session_id, status="running")
+
+
+@app.get("/api/judge/{job_id}", response_model=JudgeJob)
+def get_judge_job(job_id: str) -> JudgeJob:
+    job = JUDGE_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Judge job not found")
+    report = job.get("report")
+    return JudgeJob(
+        job_id=job_id,
+        session_id=str(job["session_id"]),
+        status=str(job["status"]),
+        error=str(job.get("error", "")),
+        report=report if isinstance(report, JudgeReport) else None,
+    )
 
 
 @app.get("/api/session/{session_id}/report", response_model=JudgeReport)

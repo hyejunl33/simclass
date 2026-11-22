@@ -128,7 +128,17 @@ def judge():
         timeout=180,
     )
     call(f"/api/session/{sid}/end", "POST", {})
-    report = call(f"/api/session/{sid}/judge", "POST", {}, timeout=600)
+    job = call(f"/api/session/{sid}/judge/start", "POST", {})
+    report = None
+    for _ in range(300):
+        time.sleep(2)
+        current = call(f"/api/judge/{job['job_id']}", timeout=30)
+        if current["status"] == "done":
+            report = current["report"]
+            break
+        if current["status"] == "error":
+            raise RuntimeError(current.get("error", "judge failed"))
+    assert report is not None, "judge timed out"
     assert report["mode"] in {"ollama", "heuristic", "heuristic_fallback"}, report
     scored = [d for d in report["domains"] if d["status"] == "scored"]
     assert len(scored) >= 5, report
