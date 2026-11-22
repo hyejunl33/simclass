@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .lesson_ingest import decode_ingest
+from .llm import generate_student_responses
 from .models import (
     GeneratePersonasRequest,
     IngestRequest,
@@ -64,13 +65,6 @@ def load_personas(lesson_id: str) -> PersonaSet:
     ps = generate_personas(load_lesson(lesson_id))
     PERSONA_SETS[lesson_id] = ps
     return ps
-
-
-MOCK_LINES = {
-    "harin": "국어사전에 나오는 뜻이요?",
-    "junseo": "비싼 거요?",
-    "minji": "친구랑 순서가 같아야 친구예요?",
-}
 
 
 @app.get("/health")
@@ -136,17 +130,12 @@ def turn(req: TurnRequest) -> TurnResponse:
     if not personas:
         raise HTTPException(status_code=400, detail="No personas available")
 
-    count = 1 if len(req.teacher_utterance) < 12 else 2
-    chosen = personas[:count]
-    students = [
-        StudentResponse(
-            id=p["id"],
-            name=p["name"],
-            text=MOCK_LINES.get(p["id"], "잘 모르겠어요."),
-            state="thinking" if p["confidence"] != "낮음" else "confused",
-            mastery=p["initial_mastery"],
-        )
-        for p in chosen
-    ]
+    result = generate_student_responses(
+        load_lesson(req.lesson_id),
+        personas,
+        req.phase_id,
+        req.teacher_utterance,
+    )
+    students = [StudentResponse(**s) for s in result["students"]]
     kt = {p["id"]: p["initial_mastery"] for p in personas}
-    return TurnResponse(students=students, kt=kt, mode="mock")
+    return TurnResponse(students=students, kt=kt, mode=result["mode"])

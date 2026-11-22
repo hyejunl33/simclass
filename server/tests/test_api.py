@@ -112,3 +112,31 @@ def test_review_personas_roundtrip():
     assert r.status_code == 200, r.text
     saved = client.get("/api/personas/objects-meaning").json()
     assert saved["personas"][0]["misconception"] == "의미는 그냥 사전 뜻이다."
+
+
+def test_prompt_forbids_giving_the_answer():
+    from app.lesson_ingest import ingest_hwp
+    from app.llm import build_prompt
+
+    lesson = client.get("/api/lesson/objects-meaning").json()
+    from app.models import LessonSpec
+
+    spec = LessonSpec(**lesson)
+    personas = client.get("/api/personas/objects-meaning").json()["personas"]
+    prompt = build_prompt(spec, personas, "concept", "물건의 의미는 무엇일까요?")
+    joined = "\n".join(p["content"] for p in prompt)
+    assert "NEVER state the lesson's final answer" in joined
+
+
+def test_llm_falls_back_when_ollama_is_unavailable(monkeypatch):
+    from app.lesson_ingest import ingest_hwp
+    from app.llm import generate_student_responses
+    from app.models import LessonSpec
+
+    lesson = LessonSpec(**client.get("/api/lesson/objects-meaning").json())
+    personas = client.get("/api/personas/objects-meaning").json()["personas"]
+    monkeypatch.setenv("LLM_MODE", "ollama")
+    monkeypatch.setenv("OLLAMA_URL", "http://127.0.0.1:1/api/chat")
+    result = generate_student_responses(lesson, personas, "concept", "물건의 의미는 무엇일까요?")
+    assert result["mode"] == "mock_fallback"
+    assert 1 <= len(result["students"]) <= 2

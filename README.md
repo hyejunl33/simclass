@@ -68,6 +68,21 @@ responses so the UI loop can be tested without a model. Use the "HWP 수업안
 server returns a `LessonSpec`; the UI shows the topic, phase count, duration, and
 whether review is needed.
 
+## Local LLM (Ollama)
+
+The server uses a prompt-only small model; no fine-tuning.
+
+```bash
+# Mac mini
+ollama pull qwen2.5:3b-instruct-q4_K_M
+LLM_MODE=ollama OLLAMA_MODEL=qwen2.5:3b-instruct-q4_K_M \
+  uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+If Ollama is unavailable, the server returns cached mock responses and the UI
+shows a fallback mode. The prompt explicitly forbids giving the lesson's final
+answer.
+
 ## Docs
 
 - [`docs/spec.md`](docs/spec.md) — product and implementation spec
