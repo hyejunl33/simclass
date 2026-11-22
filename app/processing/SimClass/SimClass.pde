@@ -121,7 +121,7 @@ void draw() {
   textSize(24);
   text("SimClass · 즐생 수업 리허설", 36, 48);
 
-  drawButton(560, 22, 150, 42, startButtonLabel(), isSessionRunning());
+  drawButton(560, 22, 150, 42, startButtonLabel(), !(sessionStarted && !sessionEnded));
   drawButton(720, 22, 150, 42, recording ? "녹음 중... 놓으세요" : "음성 입력 (hold)",
       isSessionRunning(), recording ? color(210, 40, 40) : color(245, 247, 250),
       recording ? color(255) : color(40, 45, 55));

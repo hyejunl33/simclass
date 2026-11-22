@@ -262,3 +262,22 @@ def test_session_flow_advance_end_replay():
 def test_unknown_session_is_404():
     assert client.get("/api/session/nope/replay").status_code == 404
     assert client.post("/api/session/nope/end").status_code == 404
+
+
+def test_replay_unvisited_phases_have_zero_actual_time():
+    sid = "session-unvisited-test"
+    client.post("/api/session/start", json={"lesson_id": "objects-meaning", "session_id": sid})
+    client.post(
+        "/api/turn",
+        json={
+            "session_id": sid,
+            "lesson_id": "objects-meaning",
+            "phase_id": "intro",
+            "teacher_utterance": "지난 시간에 무엇을 배웠나요?",
+        },
+    )
+    client.post(f"/api/session/{sid}/end")
+    phases = client.get(f"/api/session/{sid}/replay").json()["phases"]
+    assert phases[0]["actual_sec"] >= 0
+    assert phases[2]["actual_sec"] == 0
+    assert phases[3]["actual_sec"] == 0

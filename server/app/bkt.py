@@ -33,5 +33,8 @@ def infer_correct(text: str, misconception: str = "") -> bool:
         return False
     if misconception and misconception in text:
         return False
-    correct_markers = ["경험", "마음", "사람마다", "소중한 이유", "함께한"]
+    correct_markers = [
+        "경험", "마음", "사람마다", "소중한 이유", "함께한",
+        "생각", "의도", "가치", "중요",
+    ]
     return any(marker in text for marker in correct_markers)

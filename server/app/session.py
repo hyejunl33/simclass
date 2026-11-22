@@ -192,9 +192,12 @@ def replay(session: SessionState) -> ReplayResponse:
     events = session.phase_events or []
     phases: list[PhaseTiming] = []
     for i, phase in enumerate(session.lesson.phases):
-        start = events[i].at if i < len(events) else 0.0
-        end = events[i + 1].at if i + 1 < len(events) else duration
-        actual = round(max(0.0, end - start), 1)
+        if i >= len(events):
+            actual = 0.0
+        else:
+            start = events[i].at
+            end = events[i + 1].at if i + 1 < len(events) else duration
+            actual = round(max(0.0, end - start), 1)
         phases.append(
             PhaseTiming(
                 id=phase.id,
