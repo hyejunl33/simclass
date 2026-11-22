@@ -417,3 +417,18 @@ def test_human_validation_agreement(tmp_path, monkeypatch):
     assert body["pairs"] == len(scores)
     assert body["exact_agreement"] == 1.0
     assert body["cohen_kappa"] == 1.0
+
+
+def test_judge_accepts_speaker_prefixed_quotes():
+    from app.judge import _find_quote
+    from app.session import TranscriptEntry
+
+    transcript = [
+        TranscriptEntry(
+            t=0, phase_id="intro", phase_name="학습 문제 확인",
+            speaker="teacher", name="교사", text="지난 시간에 무엇을 배웠나요?",
+        )
+    ]
+    assert _find_quote(transcript, "교사: 지난 시간에 무엇을 배웠나요?", 0) == 0
+    assert _find_quote(transcript, "[0] 교사: 지난 시간에 무엇을 배웠나요?", 0) == 0
+    assert _find_quote(transcript, "학생(하린): 다른 말", 0) is None

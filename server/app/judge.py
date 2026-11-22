@@ -114,8 +114,15 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", "", text or "")
 
 
+def _clean_quote(quote: str) -> str:
+    text = (quote or "").strip().strip('"').strip("“”").strip("'")
+    text = re.sub(r"^\s*\[\d+\]\s*", "", text)
+    text = re.sub(r"^\s*(교사|학생(?:\([^)]*\))?)\s*:\s*", "", text)
+    return text.strip()
+
+
 def _quote_in_entry(quote: str, entry: TranscriptEntry) -> bool:
-    q = _norm(quote)
+    q = _norm(_clean_quote(quote))
     return len(q) >= 2 and q in _norm(entry.text)
 
 
@@ -424,7 +431,7 @@ def _validate_llm_domains(
                     f"{domain_id}: quote not found in transcript at turn_id {turn_id}: {quote[:60]}"
                 )
                 continue
-            evidence.append(Evidence(turn_id=found, quote=quote[:220]))
+            evidence.append(Evidence(turn_id=found, quote=_clean_quote(quote)[:220]))
         if score > 0 and not evidence:
             errors.append(f"{domain_id}: score {score} has no valid evidence")
         domains.append(
