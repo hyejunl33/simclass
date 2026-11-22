@@ -6,10 +6,23 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from .asr import transcribe_bytes
 from .bkt import infer_correct, update_mastery
+from .judge import (
+    HumanCoding,
+    JudgeReport,
+    ValidationSample,
+    agreement,
+    judge_session,
+    load_report,
+    save_human_coding,
+    save_report,
+    to_markdown,
+    validation_sample,
+)
 from .lesson_ingest import decode_ingest
 from .llm import generate_student_responses
 from .models import (
@@ -40,7 +53,7 @@ from .tts import synthesize
 ROOT = Path(__file__).resolve().parents[2]
 LESSON_DIR = ROOT / "fixtures" / "lesson_plans"
 
-app = FastAPI(title="SimClass", version="0.4.0")
+app = FastAPI(title="SimClass", version="0.5.0")
 REVIEWED_LESSONS: dict[str, LessonSpec] = {}
 PERSONA_SETS: dict[str, PersonaSet] = {}
 SESSIONS: dict[str, SessionState] = {}
@@ -97,7 +110,7 @@ def get_session(session_id: str) -> SessionState:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "mode": "mock", "version": "0.4.0"}
+    return {"ok": True, "mode": "mock", "version": "0.5.0"}
 
 
 @app.get("/api/lesson/{lesson_id}", response_model=LessonSpec)
@@ -182,6 +195,54 @@ def finish_session(session_id: str) -> SessionSummary:
 @app.get("/api/session/{session_id}/replay", response_model=ReplayResponse)
 def session_replay(session_id: str) -> ReplayResponse:
     return replay(get_session(session_id))
+
+
+@app.post("/api/session/{session_id}/judge", response_model=JudgeReport)
+def judge(session_id: str) -> JudgeReport:
+    session = get_session(session_id)
+    if not session.completed:
+        raise HTTPException(status_code=409, detail="End the session before judging")
+    report = judge_session(session)
+    save_report(report)
+    return report
+
+
+@app.get("/api/session/{session_id}/report", response_model=JudgeReport)
+def get_report(session_id: str) -> JudgeReport:
+    report = load_report(session_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+
+@app.get("/api/session/{session_id}/report.md", response_class=PlainTextResponse)
+def get_report_markdown(session_id: str) -> str:
+    session = get_session(session_id)
+    report = load_report(session_id)
+    if report is None:
+        if not session.completed:
+            raise HTTPException(status_code=409, detail="End the session before judging")
+        report = judge_session(session)
+        save_report(report)
+    return to_markdown(report)
+
+
+@app.get("/api/validation/sample", response_model=list[ValidationSample])
+def get_validation_sample(ratio: float = 0.25) -> list[ValidationSample]:
+    return validation_sample(ratio)
+
+
+@app.post("/api/validation/{session_id}")
+def submit_human_coding(session_id: str, coding: HumanCoding) -> dict[str, Any]:
+    if load_report(session_id) is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    path = save_human_coding(session_id, coding)
+    return {"ok": True, "path": str(path)}
+
+
+@app.get("/api/validation/agreement")
+def get_agreement() -> dict[str, Any]:
+    return agreement()
 
 
 @app.post("/api/asr", response_model=ASRResponse)

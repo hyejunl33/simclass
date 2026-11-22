@@ -1,10 +1,5 @@
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-.DS_Store
-*.hwp
-*.hwpx
-*.pdf
-app/processing/SimClass/build/
-app/processing/SimClass/SimClass.jar
+reports/*.json
+reports/*.md
+reports/validation/*.json
+!reports/.gitkeep
+!reports/validation/.gitkeep

@@ -281,3 +281,139 @@ def test_replay_unvisited_phases_have_zero_actual_time():
     assert phases[0]["actual_sec"] >= 0
     assert phases[2]["actual_sec"] == 0
     assert phases[3]["actual_sec"] == 0
+
+
+def _run_judged_session(session_id: str):
+    client.post(
+        "/api/session/start",
+        json={"lesson_id": "objects-meaning", "session_id": session_id},
+    )
+    exchanges = [
+        ("intro", "지난 시간에 무엇을 배웠나요?"),
+        ("concept", "왜 그렇게 생각했어요? 어떻게 알 수 있을까요?"),
+        ("concept", "친구의 생각과 비교해 볼까요?"),
+        ("interpretation", "여러분의 경험과 연결해 볼까요?"),
+    ]
+    for phase_id, utterance in exchanges:
+        if phase_id != "intro":
+            client.post(f"/api/session/{session_id}/advance")
+        client.post(
+            "/api/turn",
+            json={
+                "session_id": session_id,
+                "lesson_id": "objects-meaning",
+                "phase_id": phase_id,
+                "teacher_utterance": utterance,
+            },
+        )
+    client.post(f"/api/session/{session_id}/end")
+
+
+def test_judge_report_has_valid_evidence_and_markdown(tmp_path, monkeypatch):
+    import app.judge as judge_mod
+
+    monkeypatch.setattr(judge_mod, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(judge_mod, "VALIDATION_DIR", tmp_path / "validation")
+
+    sid = "judge-report-test"
+    _run_judged_session(sid)
+
+    r = client.post(f"/api/session/{sid}/judge")
+    assert r.status_code == 200, r.text
+    report = r.json()
+    assert report["mode"] == "heuristic"
+    assert report["teacher_turns"] == 4
+    domains = {d["id"]: d for d in report["domains"]}
+    assert set(domains) == {
+        "structure", "questioning", "interaction", "assessment", "conditions", "delivery"
+    }
+    assert domains["delivery"]["status"] == "not_assessed"
+    assert domains["delivery"]["score"] is None
+
+    transcript = client.get(f"/api/session/{sid}/replay").json()["transcript"]
+    texts = ["".join(e["text"].split()) for e in transcript]
+    for d in report["domains"]:
+        if d["status"] != "scored" or not d["score"]:
+            continue
+        assert d["evidence"], d["id"]
+        for ev in d["evidence"]:
+            quote = "".join(ev["quote"].split())
+            assert quote in texts[ev["turn_id"]], (d["id"], ev)
+
+    md = client.get(f"/api/session/{sid}/report.md")
+    assert md.status_code == 200, md.text
+    assert "# SimClass 수업실연 피드백" in md.text
+    assert "N/A" in md.text
+    assert "공식 채점표가 아닙니다" in md.text
+    assert (tmp_path / f"{sid}.json").exists()
+    assert (tmp_path / f"{sid}.md").exists()
+
+
+def test_judge_rejects_invalid_evidence_quotes():
+    from app.judge import _validate_llm_domains
+    from app.session import TranscriptEntry
+
+    transcript = [
+        TranscriptEntry(
+            t=10, phase_id="concept", phase_name="개념 형성",
+            speaker="teacher", name="교사", text="왜 그렇게 생각했어요?",
+        ),
+        TranscriptEntry(
+            t=11, phase_id="concept", phase_name="개념 형성",
+            speaker="student", name="하린", text="경험 때문이에요.", student_id="harin",
+        ),
+    ]
+    payload = {
+        "domains": [
+            {
+                "id": "questioning",
+                "score": 3,
+                "evidence": [{"turn_id": 0, "quote": "왜 그렇게 생각했어요?"}],
+                "reason": "좋은 발문", "improvement": "유지",
+            },
+            {
+                "id": "structure",
+                "score": 2,
+                "evidence": [{"turn_id": 0, "quote": "대화록에 없는 문장"}],
+                "reason": "구조", "improvement": "정리",
+            },
+        ]
+    }
+    domains, errors, rejected = _validate_llm_domains(payload, transcript)
+    by_id = {d.id: d for d in domains}
+    assert by_id["questioning"].score == 3
+    assert "대화록에 없는 문장" in rejected
+    assert by_id["structure"].score == 0
+    assert any("not found" in e for e in errors)
+
+
+def test_human_validation_agreement(tmp_path, monkeypatch):
+    import app.judge as judge_mod
+
+    monkeypatch.setattr(judge_mod, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(judge_mod, "VALIDATION_DIR", tmp_path / "validation")
+
+    sid = "judge-validation-test"
+    _run_judged_session(sid)
+    report = client.post(f"/api/session/{sid}/judge").json()
+    scores = {
+        d["id"]: d["score"]
+        for d in report["domains"]
+        if d["status"] == "scored"
+    }
+    r = client.post(
+        f"/api/validation/{sid}",
+        json={"rater": "human-1", "scores": scores, "notes": "double coded"},
+    )
+    assert r.status_code == 200, r.text
+
+    sample = client.get("/api/validation/sample?ratio=1.0")
+    assert sample.status_code == 200, sample.text
+    assert any(s["session_id"] == sid for s in sample.json())
+
+    agreement = client.get("/api/validation/agreement")
+    assert agreement.status_code == 200, agreement.text
+    body = agreement.json()
+    assert body["pairs"] == len(scores)
+    assert body["exact_agreement"] == 1.0
+    assert body["cohen_kappa"] == 1.0
