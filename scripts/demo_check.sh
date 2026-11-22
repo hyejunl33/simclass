@@ -63,14 +63,27 @@ def personas():
 
 def audio_adapters():
     import base64
+    import io
+    import wave
 
     try:
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(16000)
+            wav.writeframes(b"\x00\x00" * 8000)
         asr = call(
             "/api/asr",
             "POST",
-            {"filename": "smoke.wav", "data_base64": base64.b64encode(b"RIFF0000WAVE").decode()},
+            {
+                "filename": "smoke.wav",
+                "data_base64": base64.b64encode(buf.getvalue()).decode(),
+            },
+            timeout=300,
         )
-        print(f"      ASR mode: {asr.get('mode')} · text: {asr.get('text', '')[:40]}")
+        print(f"      ASR mode: {asr.get('mode')} · duration: {asr.get('duration_sec')}s "
+              f"· text: {asr.get('text', '')[:40]!r}")
     except Exception as exc:
         print(f"      ASR unavailable (allowed in mock): {exc}")
     try:
