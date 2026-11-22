@@ -15,17 +15,24 @@ run_judge = sys.argv[2] == "--judge"
 errors = []
 
 
-def call(path, method="GET", body=None, timeout=120):
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(
-        base + path,
-        data=data,
-        method=method,
-        headers={"Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as res:
-        raw = res.read().decode("utf-8")
-    return json.loads(raw) if raw else {}
+def call(path, method="GET", body=None, timeout=120, tries=4):
+    last = None
+    for attempt in range(tries):
+        try:
+            data = json.dumps(body).encode() if body is not None else None
+            req = urllib.request.Request(
+                base + path,
+                data=data,
+                method=method,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as res:
+                raw = res.read().decode("utf-8")
+            return json.loads(raw) if raw else {}
+        except Exception as exc:
+            last = exc
+            time.sleep(1.0 + attempt)
+    raise last
 
 
 def check(name, fn):

@@ -225,6 +225,19 @@ def start_judge(session_id: str) -> JudgeJob:
     session = get_session(session_id)
     if not session.completed:
         raise HTTPException(status_code=409, detail="End the session before judging")
+    for existing_id, existing in JUDGE_JOBS.items():
+        if existing.get("session_id") == session_id and existing.get("status") in {
+            "running",
+            "done",
+        }:
+            report = existing.get("report")
+            return JudgeJob(
+                job_id=existing_id,
+                session_id=session_id,
+                status=str(existing.get("status")),
+                error=str(existing.get("error", "")),
+                report=report if isinstance(report, JudgeReport) else None,
+            )
     job_id = uuid.uuid4().hex[:12]
     JUDGE_JOBS[job_id] = {
         "session_id": session_id,
