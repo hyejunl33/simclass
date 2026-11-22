@@ -4,18 +4,25 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+import base64
+
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from .asr import transcribe_bytes
 from .bkt import infer_correct, update_mastery
 from .lesson_ingest import decode_ingest
 from .llm import generate_student_responses
 from .models import (
+    ASRResponse,
+    AudioRequest,
     GeneratePersonasRequest,
     IngestRequest,
     LessonSpec,
     PersonaSet,
+    TTSRequest,
 )
+from .tts import synthesize
 from .personas import generate_personas
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -120,6 +127,31 @@ def review_personas(lesson_id: str, ps: PersonaSet) -> PersonaSet:
         raise HTTPException(status_code=400, detail="Persona IDs must be unique")
     PERSONA_SETS[lesson_id] = ps
     return ps
+
+
+@app.post("/api/asr", response_model=ASRResponse)
+def asr(req: AudioRequest) -> ASRResponse:
+    try:
+        data = base64.b64decode(req.data_base64, validate=True)
+        text, mode = transcribe_bytes(data)
+        return ASRResponse(text=text, mode=mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"ASR unavailable: {exc}") from exc
+
+
+@app.post("/api/tts")
+def tts(req: TTSRequest) -> Response:
+    try:
+        audio, _mode = synthesize(req.text, req.voice)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"TTS unavailable: {exc}") from exc
+    if not audio:
+        return Response(status_code=204)
+    return Response(content=audio, media_type="audio/wav")
 
 
 @app.post("/api/turn", response_model=TurnResponse)

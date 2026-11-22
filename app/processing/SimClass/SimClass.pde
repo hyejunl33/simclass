@@ -6,15 +6,24 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.concurrent.LinkedBlockingQueue;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.TargetDataLine;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import processing.data.JSONArray;
 import processing.data.JSONObject;
 
 // SimClass — Processing client (MVP + HWP ingest)
 // Sends a teacher utterance to FastAPI and renders mock student responses.
 
-final String SERVER_BASE = "http://127.0.0.1:8000";
-final String TURN_URL = SERVER_BASE + "/api/turn";
-final String INGEST_URL = SERVER_BASE + "/api/lesson/ingest";
+String SERVER_BASE = "http://127.0.0.1:8000";
 final String LESSON_ID = "objects-meaning";
 final String PHASE_ID = "concept";
 
@@ -24,7 +33,10 @@ String lessonTopic = "물건의 의미는 무엇일까요?";
 String lessonSummary = "HWP를 불러오면 수업안 요약이 표시됩니다.";
 String lessonId = "objects-meaning";
 ArrayList<String> misconceptionOptions = new ArrayList<String>();
+LinkedBlockingQueue<String> ttsQueue = new LinkedBlockingQueue<String>();
 boolean sending = false;
+boolean recording = false;
+VoiceRecorder recorder;
 
 ArrayList<StudentView> students = new ArrayList<StudentView>();
 ArrayList<String> transcript = new ArrayList<String>();
@@ -32,9 +44,22 @@ ArrayList<String> transcript = new ArrayList<String>();
 void setup() {
   size(1100, 720);
   textFont(createFont("SansSerif", 16));
+  String[] cfg = loadStrings("server.txt");
+  if (cfg != null && cfg.length > 0 && cfg[0].trim().length() > 0) {
+    SERVER_BASE = cfg[0].trim();
+  }
   students.add(new StudentView("harin", "하린", "국어사전 뜻", "confused", 0.55));
   students.add(new StudentView("junseo", "준서", "비싼 것", "thinking", 0.35));
   students.add(new StudentView("minji", "민지", "같은 순서 친구", "confused", 0.20));
+
+  thread(() -> {
+    while (true) {
+      try {
+        playTTS(ttsQueue.take());
+      } catch (InterruptedException ignored) {
+      }
+    }
+  });
 }
 
 void draw() {
@@ -59,6 +84,15 @@ void draw() {
   fill(50, 90, 180);
   textSize(14);
   text("HWP 수업안 불러오기", 898, 48);
+
+  // Voice push-to-talk button
+  fill(recording ? color(210, 40, 40) : color(245, 247, 250));
+  stroke(200, 205, 215);
+  rect(690, 22, 180, 42, 10);
+  noStroke();
+  fill(recording ? color(255) : color(40, 45, 55));
+  textSize(14);
+  text(recording ? "녹음 중... 놓으세요" : "음성 입력 (hold)", 706, 48);
 
   // Student cards
   for (int i = 0; i < students.size(); i++) {
@@ -143,6 +177,10 @@ void keyTyped() {
 }
 
 void mousePressed() {
+  if (mouseX > 690 && mouseX < 870 && mouseY > 22 && mouseY < 64) {
+    startRecording();
+    return;
+  }
   if (mouseX > 884 && mouseX < 1064 && mouseY > 22 && mouseY < 64) {
     selectInput("HWP 수업안 선택", "hwpSelected");
     return;
@@ -164,6 +202,12 @@ void mousePressed() {
   }
 }
 
+void mouseReleased() {
+  if (recording && mouseButton == LEFT) {
+    stopRecordingAndSend();
+  }
+}
+
 void hwpSelected(File selection) {
   if (selection == null) return;
   status = "HWP를 읽는 중...";
@@ -174,7 +218,7 @@ void hwpSelected(File selection) {
       JSONObject payload = new JSONObject();
       payload.setString("filename", selection.getName());
       payload.setString("data_base64", encoded);
-      String response = postJson(INGEST_URL, payload.toString());
+      String response = postJson(SERVER_BASE + "/api/lesson/ingest", payload.toString());
       JSONObject lesson = parseJSONObject(response);
       lessonId = lesson.getString("id");
       lessonTopic = lesson.getString("topic");
@@ -251,6 +295,64 @@ void savePersonas() {
   }
 }
 
+void startRecording() {
+  if (recording) return;
+  try {
+    recorder = new VoiceRecorder();
+    recorder.start();
+    recording = true;
+    status = "녹음 중... 버튼을 놓으면 전송합니다.";
+  } catch (Exception e) {
+    status = "마이크 오류: " + e.getMessage();
+  }
+}
+
+void stopRecordingAndSend() {
+  if (!recording || recorder == null) return;
+  recording = false;
+  try {
+    byte[] wav = recorder.stop();
+    String encoded = Base64.getEncoder().encodeToString(wav);
+    JSONObject payload = new JSONObject();
+    payload.setString("filename", "teacher.wav");
+    payload.setString("data_base64", encoded);
+    thread(() -> {
+      try {
+        JSONObject res = parseJSONObject(postJson(SERVER_BASE + "/api/asr", payload.toString()));
+        String text = res.getString("text");
+        input = text;
+        transcript.add("[음성] " + text);
+        status = "음성 인식 완료 (" + res.getString("mode") + ")";
+        sendTurn();
+      } catch (Exception e) {
+        status = "ASR 실패: " + e.getMessage();
+      }
+    });
+  } catch (Exception e) {
+    status = "녹음 종료 실패: " + e.getMessage();
+  }
+}
+
+void speak(String text) {
+  ttsQueue.offer(text);
+}
+
+void playTTS(String text) {
+  try {
+    JSONObject payload = new JSONObject();
+    payload.setString("text", text);
+    byte[] audio = requestBytes(SERVER_BASE + "/api/tts", payload.toString());
+    if (audio.length == 0) return;
+    AudioInputStream ais = AudioSystem.getAudioInputStream(new ByteArrayInputStream(audio));
+    Clip clip = AudioSystem.getClip();
+    clip.open(ais);
+    clip.start();
+    Thread.sleep(clip.getMicrosecondLength() / 1000 + 150);
+    clip.close();
+  } catch (Exception ignored) {
+  }
+}
+
 void sendTurn() {
   String utterance = input.trim();
   if (utterance.length() == 0 || sending) return;
@@ -266,7 +368,7 @@ void sendTurn() {
       payload.setString("lesson_id", LESSON_ID);
       payload.setString("phase_id", PHASE_ID);
       payload.setString("teacher_utterance", utterance);
-      String response = postJson(TURN_URL, payload.toString());
+      String response = postJson(SERVER_BASE + "/api/turn", payload.toString());
       JSONObject res = parseJSONObject(response);
       JSONArray arr = res.getJSONArray("students");
       for (int i = 0; i < arr.size(); i++) {
@@ -275,6 +377,7 @@ void sendTurn() {
         String text = s.getString("text");
         String state = s.getString("state");
         transcript.add(name + ": " + text);
+        speak(text);
         for (StudentView sv : students) {
           if (sv.id.equals(s.getString("id"))) {
             sv.state = state;
@@ -323,10 +426,69 @@ String requestJson(String method, String url, String body) throws Exception {
   return sb.toString();
 }
 
+byte[] requestBytes(String url, String body) throws Exception {
+  HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+  conn.setRequestMethod("POST");
+  conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+  conn.setDoOutput(true);
+  try (OutputStream os = conn.getOutputStream()) {
+    os.write(body.getBytes(StandardCharsets.UTF_8));
+  }
+  int code = conn.getResponseCode();
+  if (code == 204) return new byte[0];
+  if (code != 200) throw new RuntimeException("HTTP " + code);
+  ByteArrayOutputStream out = new ByteArrayOutputStream();
+  try (InputStream in = conn.getInputStream()) {
+    byte[] buf = new byte[8192];
+    int n;
+    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+  }
+  return out.toByteArray();
+}
+
 color stateColor(String state) {
   if (state.equals("confused")) return color(200, 90, 80);
   if (state.equals("thinking")) return color(190, 140, 40);
   return color(60, 140, 100);
+}
+
+class VoiceRecorder {
+  AudioFormat format;
+  TargetDataLine line;
+  ByteArrayOutputStream pcm;
+  Thread thread;
+  volatile boolean running;
+
+  void start() throws Exception {
+    format = new AudioFormat(16000, 16, 1, true, false);
+    DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+    line = (TargetDataLine) AudioSystem.getLine(info);
+    line.open(format);
+    line.start();
+    pcm = new ByteArrayOutputStream();
+    running = true;
+    thread = new Thread(() -> {
+      byte[] buf = new byte[4096];
+      while (running) {
+        int n = line.read(buf, 0, buf.length);
+        if (n > 0) pcm.write(buf, 0, n);
+      }
+    });
+    thread.start();
+  }
+
+  byte[] stop() throws Exception {
+    running = false;
+    line.stop();
+    line.close();
+    thread.join(800);
+    byte[] raw = pcm.toByteArray();
+    AudioInputStream ais = new AudioInputStream(
+        new ByteArrayInputStream(raw), format, raw.length / format.getFrameSize());
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    AudioSystem.write(ais, AudioFileFormat.Type.WAVE, out);
+    return out.toByteArray();
+  }
 }
 
 class StudentView {

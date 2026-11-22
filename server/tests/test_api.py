@@ -181,3 +181,20 @@ def test_turn_updates_kt_across_turns():
         for pid in first_kt
         for kc in first_kt[pid]
     )
+
+
+def test_asr_mock_returns_text():
+    import base64
+
+    r = client.post(
+        "/api/asr",
+        json={"filename": "a.wav", "data_base64": base64.b64encode(b"RIFF0000WAVE").decode()},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["mode"] == "mock"
+    assert "의미" in r.json()["text"]
+
+
+def test_tts_mock_returns_no_content():
+    r = client.post("/api/tts", json={"text": "국어사전에 나오는 뜻이요?"})
+    assert r.status_code == 204

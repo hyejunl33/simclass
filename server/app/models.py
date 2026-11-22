@@ -65,3 +65,18 @@ class PersonaSet(BaseModel):
 
 class GeneratePersonasRequest(BaseModel):
     lesson_id: str = "objects-meaning"
+
+
+class AudioRequest(BaseModel):
+    filename: str = "audio.wav"
+    data_base64: str
+
+
+class ASRResponse(BaseModel):
+    text: str
+    mode: str
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: str = "Yuna"

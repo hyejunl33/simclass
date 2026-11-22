@@ -83,11 +83,21 @@ If Ollama is unavailable, the server returns cached mock responses and the UI
 shows a fallback mode. The prompt explicitly forbids giving the lesson's final
 answer.
 
+ASR and TTS are optional adapters:
+
+- `ASR_MODE=mock|mlx_whisper|http`
+- `TTS_MODE=mock|say|http`
+- On the Mac mini: `ASR_MODE=mlx TTS_MODE=say`
+
+See [docs/mac_mini_setup.md](docs/mac_mini_setup.md) and
+`scripts/connect_mac_mini.sh`.
+
 ## Docs
 
 - [`docs/spec.md`](docs/spec.md) — product and implementation spec
 - [`docs/rubric.md`](docs/rubric.md) — lesson-demonstration rubric and evidence rules
 - [`docs/ws_protocol.md`](docs/ws_protocol.md) — message contract
+- [`docs/mac_mini_setup.md`](docs/mac_mini_setup.md) — Mac mini runtime + laptop connection
 - [`fixtures/lesson_plans/objects_meaning.json`](fixtures/lesson_plans/objects_meaning.json) — 즐생 lesson fixture
 - [`fixtures/personas/objects_meaning.json`](fixtures/personas/objects_meaning.json) — three persona fixture
 
@@ -95,5 +105,6 @@ answer.
 
 Tickets 01–05 are implemented: end-to-end mock loop, HWP ingest, persona
 generation/editing, local Ollama adapter with fallback, and BKT mastery.
-Next slices are real-time voice (issue #7) and TTS (issue #8); both need the
-Mac mini Whisper/`say` runtime for end-to-end verification.
+The ASR/TTS adapters and Processing hold-to-talk/TTS hooks are implemented.
+End-to-end verification now needs the Mac mini runtime; see
+`docs/mac_mini_setup.md`.
