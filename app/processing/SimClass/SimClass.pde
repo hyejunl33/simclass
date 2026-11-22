@@ -52,14 +52,14 @@ void setup() {
   students.add(new StudentView("junseo", "준서", "비싼 것", "thinking", 0.35));
   students.add(new StudentView("minji", "민지", "같은 순서 친구", "confused", 0.20));
 
-  thread(() -> {
+  new Thread(() -> {
     while (true) {
       try {
         playTTS(ttsQueue.take());
       } catch (InterruptedException ignored) {
       }
     }
-  });
+  }).start();
 }
 
 void draw() {
@@ -211,7 +211,7 @@ void mouseReleased() {
 void hwpSelected(File selection) {
   if (selection == null) return;
   status = "HWP를 읽는 중...";
-  thread(() -> {
+  new Thread(() -> {
     try {
       byte[] bytes = loadBytes(selection.getAbsolutePath());
       String encoded = Base64.getEncoder().encodeToString(bytes);
@@ -264,7 +264,7 @@ void hwpSelected(File selection) {
     } catch (Exception e) {
       status = "HWP 파싱 실패: " + e.getMessage();
     }
-  });
+  }).start();
 }
 
 void savePersonas() {
@@ -316,7 +316,7 @@ void stopRecordingAndSend() {
     JSONObject payload = new JSONObject();
     payload.setString("filename", "teacher.wav");
     payload.setString("data_base64", encoded);
-    thread(() -> {
+    new Thread(() -> {
       try {
         JSONObject res = parseJSONObject(postJson(SERVER_BASE + "/api/asr", payload.toString()));
         String text = res.getString("text");
@@ -327,7 +327,7 @@ void stopRecordingAndSend() {
       } catch (Exception e) {
         status = "ASR 실패: " + e.getMessage();
       }
-    });
+    }).start();
   } catch (Exception e) {
     status = "녹음 종료 실패: " + e.getMessage();
   }
@@ -361,7 +361,7 @@ void sendTurn() {
   status = "서버에 발문을 보내는 중...";
   transcript.add("T: " + utterance);
 
-  thread(() -> {
+  new Thread(() -> {
     try {
       JSONObject payload = new JSONObject();
       payload.setString("session_id", "demo-1");
@@ -397,7 +397,7 @@ void sendTurn() {
     } finally {
       sending = false;
     }
-  });
+  }).start();
 }
 
 String postJson(String url, String body) throws Exception {
