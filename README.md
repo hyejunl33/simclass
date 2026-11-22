@@ -105,7 +105,7 @@ transcript; invalid quotes are rejected and the judge retries. Visual behaviors
 are `N/A`, and audio delivery is scored from ASR speech duration when voice input
 was used.
 
-- `POST /api/session/{id}/judge` — run the judge
+- `POST /api/session/{id}/judge/start` + `GET /api/judge/{job_id}` — async judge
 - `GET /api/session/{id}/report.md` — Markdown report
 - `GET /api/validation/sample?ratio=0.25` — human double-coding sample
 - `GET /api/validation/agreement` — exact agreement + Cohen's kappa
@@ -156,8 +156,13 @@ See [docs/mac_mini_setup.md](docs/mac_mini_setup.md) and
 
 ## Status
 
-Tickets 01–09 are implemented: end-to-end loop, HWP ingest, persona
+Tickets 01–10 are implemented: end-to-end loop, HWP ingest, persona
 generation/editing, Ollama fallback, BKT mastery, real-time voice (MLX Whisper),
-macOS TTS, the 40-minute phase flow + replay, and the evidence-grounded rubric
-judge with Markdown/JSON reports and a human-validation harness. Remaining work:
-demo hardening (ticket 10) — runbook, cached fallback, sample session, README.
+macOS TTS, the 40-minute phase flow + replay, the evidence-grounded rubric judge,
+and demo hardening (runbook, scripts, cached offline mode, sample session,
+validation checklist). See [`docs/runbook.md`](docs/runbook.md).
+
+Known limitations: sessions are in-memory on one server; visual teaching
+behaviors are `N/A`; the rubric is informed by public 초등임용 2차 direction but
+is not an official scoring sheet; the 3B turn model can repeat a student; no
+cloud, auth, multi-user, or fine-tuning in this demo.

@@ -11,7 +11,14 @@ fine-tuning.
 2. **Rubric scoring.** For each domain the judge returns a score 0–3, evidence
    quotes, a short reason, and one actionable improvement.
 
-`POST /api/session/{id}/judge` runs both stages and writes:
+`POST /api/session/{id}/judge` runs both stages synchronously. Because a 7B
+judge can take 45–120 seconds, the UI uses the async job API:
+
+- `POST /api/session/{id}/judge/start` → `{job_id, status}`
+- `GET /api/judge/{job_id}` → `running | done | error` + report
+
+The job endpoint is idempotent per session, so a retried start returns the
+existing job. Both paths write:
 
 - `reports/{session_id}.json` — full structured report
 - `reports/{session_id}.md` — Markdown report

@@ -51,6 +51,7 @@ String sessionId = "";
 boolean sessionStarted = false;
 boolean sessionEnded = false;
 long sessionStartMs = 0;
+long sessionEndMs = 0;
 long phaseAnchorMs = 0;
 int phaseIndex = 0;
 
@@ -102,12 +103,14 @@ void defaultPhases() {
 
 float elapsedSec() {
   if (!sessionStarted) return 0;
-  return (millis() - sessionStartMs) / 1000.0;
+  long end = (sessionEnded && sessionEndMs > 0) ? sessionEndMs : millis();
+  return (end - sessionStartMs) / 1000.0;
 }
 
 float phaseElapsedSec() {
   if (!sessionStarted) return 0;
-  return (millis() - phaseAnchorMs) / 1000.0;
+  long end = (sessionEnded && sessionEndMs > 0) ? sessionEndMs : millis();
+  return (end - phaseAnchorMs) / 1000.0;
 }
 
 int totalPlannedSec() {
@@ -505,6 +508,7 @@ void startSession() {
   sessionId = "demo-" + System.currentTimeMillis();
   phaseIndex = 0;
   sessionEnded = false;
+  sessionEndMs = 0;
   input = "";
   lastAudioSec = 0;
   status = "세션을 시작하는 중...";
@@ -518,6 +522,7 @@ void startSession() {
       phaseIndex = res.getInt("phase_index");
       sessionStartMs = millis();
       phaseAnchorMs = sessionStartMs;
+      sessionEndMs = 0;
       sessionStarted = true;
       status = "수업 시작 · " + res.getString("phase_name") + " (" + res.getInt("phase_planned_min") + "분)";
       transcript.add("[수업 시작] " + lessonTopic);
@@ -525,7 +530,9 @@ void startSession() {
       offlineMode = true;
       sessionStartMs = millis();
       phaseAnchorMs = sessionStartMs;
+      sessionEndMs = 0;
       sessionStarted = true;
+      sessionEndMs = 0;
       status = "오프라인 세션 시작 · 서버 없이 캐시 응답으로 진행합니다.";
       transcript.add("[수업 시작] " + lessonTopic + " (오프라인 캐시)");
     }
@@ -573,6 +580,7 @@ void advanceOffline() {
     transcript.add("[단계] " + p.name);
   } else {
     sessionEnded = true;
+    sessionEndMs = millis();
     status = "마지막 단계입니다. [수업 종료] 또는 [리플레이]를 선택하세요.";
   }
 }
@@ -587,11 +595,13 @@ void endSession(boolean loadReplayAfter) {
       JSONObject summary = parseJSONObject(
           postJson(SERVER_BASE + "/api/session/" + sessionId + "/end", "{}"));
       sessionEnded = true;
+      sessionEndMs = millis();
       status = "수업 종료 · " + formatClock(summary.getFloat("elapsed_sec"))
           + " · 발문 " + summary.getInt("turns") + "회";
       if (loadReplayAfter) loadReplay();
     } catch (Exception e) {
       String msg = e.getMessage() == null ? "" : e.getMessage();
+      sessionEndMs = millis();
       if (msg.contains("HTTP 404") || msg.contains("HTTP 409")) {
         sessionEnded = true;
         status = "세션이 종료되었습니다. 새 세션을 시작하세요.";
@@ -837,6 +847,7 @@ void hwpSelected(File selection) {
 
       sessionStarted = false;
       sessionEnded = false;
+      sessionEndMs = 0;
       replayMode = false;
       feedbackMode = false;
       lastAudioSec = 0;

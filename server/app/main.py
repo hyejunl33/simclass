@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import threading
 import uuid
 from pathlib import Path
@@ -123,7 +124,16 @@ def get_session(session_id: str) -> SessionState:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "mode": "mock", "version": "0.5.0"}
+    llm_mode = os.getenv("LLM_MODE", "mock").strip().lower()
+    return {
+        "ok": True,
+        "mode": llm_mode,
+        "llm_mode": llm_mode,
+        "asr_mode": os.getenv("ASR_MODE", "mock").strip().lower(),
+        "tts_mode": os.getenv("TTS_MODE", "mock").strip().lower(),
+        "judge_model": os.getenv("JUDGE_MODEL", ""),
+        "version": "0.5.0",
+    }
 
 
 @app.get("/api/lesson/{lesson_id}", response_model=LessonSpec)
