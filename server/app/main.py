@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from .bkt import infer_correct, update_mastery
 from .lesson_ingest import decode_ingest
 from .llm import generate_student_responses
 from .models import (
@@ -23,6 +24,7 @@ LESSON_DIR = ROOT / "fixtures" / "lesson_plans"
 app = FastAPI(title="SimClass", version="0.3.0")
 REVIEWED_LESSONS: dict[str, LessonSpec] = {}
 PERSONA_SETS: dict[str, PersonaSet] = {}
+SESSION_MASTERY: dict[str, dict[str, dict[str, float]]] = {}
 
 
 class TurnRequest(BaseModel):
@@ -130,12 +132,35 @@ def turn(req: TurnRequest) -> TurnResponse:
     if not personas:
         raise HTTPException(status_code=400, detail="No personas available")
 
+    lesson = load_lesson(req.lesson_id)
     result = generate_student_responses(
-        load_lesson(req.lesson_id),
+        lesson,
         personas,
         req.phase_id,
         req.teacher_utterance,
     )
+
+    if req.session_id not in SESSION_MASTERY:
+        SESSION_MASTERY[req.session_id] = {
+            p["id"]: dict(p["initial_mastery"]) for p in personas
+        }
+    state = SESSION_MASTERY[req.session_id]
+    by_id = {p["id"]: p for p in personas}
+    misconception_kc = {m.id: m.kc for m in lesson.misconceptions}
+
+    for s in result["students"]:
+        p = by_id.get(s["id"])
+        if not p:
+            continue
+        kc = misconception_kc.get(p.get("misconception_id", ""))
+        if not kc and lesson.knowledge_components:
+            kc = lesson.knowledge_components[0].id
+        if not kc:
+            continue
+        correct = infer_correct(s["text"], p.get("misconception", ""))
+        update_mastery(state[s["id"]], kc, correct)
+        s["mastery"] = dict(state[s["id"]])
+
     students = [StudentResponse(**s) for s in result["students"]]
-    kt = {p["id"]: p["initial_mastery"] for p in personas}
+    kt = {pid: dict(values) for pid, values in state.items()}
     return TurnResponse(students=students, kt=kt, mode=result["mode"])

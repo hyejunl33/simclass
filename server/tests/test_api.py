@@ -140,3 +140,44 @@ def test_llm_falls_back_when_ollama_is_unavailable(monkeypatch):
     result = generate_student_responses(lesson, personas, "concept", "물건의 의미는 무엇일까요?")
     assert result["mode"] == "mock_fallback"
     assert 1 <= len(result["students"]) <= 2
+
+
+def test_bkt_moves_in_the_expected_direction():
+    from app.bkt import update_mastery
+
+    state = {"kc1": 0.4}
+    update_mastery(state, "kc1", True)
+    assert state["kc1"] > 0.4
+    update_mastery(state, "kc1", False)
+    assert 0.01 <= state["kc1"] <= 0.99
+    assert state["kc1"] < 0.99
+
+
+def test_turn_updates_kt_across_turns():
+    session = "bkt-test"
+    first = client.post(
+        "/api/turn",
+        json={
+            "session_id": session,
+            "lesson_id": "objects-meaning",
+            "phase_id": "concept",
+            "teacher_utterance": "물건의 의미는 무엇일까요?",
+        },
+    ).json()
+    first_kt = first["kt"]
+    second = client.post(
+        "/api/turn",
+        json={
+            "session_id": session,
+            "lesson_id": "objects-meaning",
+            "phase_id": "concept",
+            "teacher_utterance": "왜 그렇게 생각했나요?",
+        },
+    ).json()
+    second_kt = second["kt"]
+    assert first_kt and second_kt
+    assert any(
+        second_kt[pid][kc] != first_kt[pid][kc]
+        for pid in first_kt
+        for kc in first_kt[pid]
+    )

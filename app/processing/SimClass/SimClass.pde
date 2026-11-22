@@ -278,6 +278,13 @@ void sendTurn() {
         for (StudentView sv : students) {
           if (sv.id.equals(s.getString("id"))) {
             sv.state = state;
+            try {
+              JSONObject m = s.getJSONObject("mastery");
+              for (Object key : m.keys()) {
+                sv.mastery = m.getFloat((String) key);
+                break;
+              }
+            } catch (Exception ignored) {}
           }
         }
       }
